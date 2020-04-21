@@ -20,10 +20,12 @@ import pandas as pd
 from testbedutils import geoprocess as gp, sblib as sb
 
 def gettime(allEpoch, epochStart, epochEnd):
-    """This function opens the netcdf file, and retrieves time.
-    
-    It pulls the dates of interest from the THREDDS (data loc) server based on d1,d2, and data location it returns
-     the indices in the NCML file of the dates d1>=time>d2
+    """this function opens the netcdf file, pulls down all of the time, then pulls the dates of
+    interest from the THREDDS (data loc) server based on d1,d2, and data location
+    it returns the indicies in the NCML file of the dates d1>=time>d2
+
+    It was modified to check if there are duplicate times, and only produces indices with unique
+    times
 
     Args:
         allEpoch (list, float): a list of floats that has epoch times in it
