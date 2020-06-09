@@ -299,7 +299,8 @@ class getObs:
                 if np.size(self.wavedataindex) == 1:
                     self.wavedataindex = np.expand_dims(self.wavedataindex, axis=0)
                 self.snaptime = nc.num2date(self.allEpoch[self.wavedataindex],
-                                            self.ncfile['time'].units)
+                                            self.ncfile['time'].units,
+                                            only_use_cftime_datetimes=False)
                 try:
                     depth = self.ncfile['nominalDepth'][:]  # this should always go
                 except IndexError:
@@ -315,7 +316,8 @@ class getObs:
                 #######################################################################################################
                 # now that wave data index is resolved, go get data
                 self.snaptime = nc.num2date(self.allEpoch[self.wavedataindex],
-                                            self.ncfile['time'].units)
+                                            self.ncfile['time'].units,
+                                            only_use_cftime_datetimes=False)
                 wavespec = {'time':        self.snaptime,  # note this is new variable names??
                             'epochtime':   self.allEpoch[self.wavedataindex],
                             'name':        str(self.ncfile.title),
@@ -508,7 +510,8 @@ class getObs:
             curr_dir = self.ncfile['currentDirection'][
                 currdataindex]  # current from direction [deg]
             self.curr_time = nc.num2date(self.allEpoch[currdataindex], self.ncfile['time'].units,
-                                         self.ncfile['time'].calendar)
+                                         self.ncfile['time'].calendar,
+                                         only_use_cftime_datetimes=False)
             # for num in range(0, len(self.curr_time)):
             #     self.curr_time[num] = self.roundtime(self.curr_time[num], roundto=roundto * 60)
             
@@ -638,7 +641,8 @@ class getObs:
             gaugeht = self.ncfile.geospatial_vertical_max
             
             self.windtime = nc.num2date(self.allEpoch[self.winddataindex],
-                                        self.ncfile['time'].units)
+                                        self.ncfile['time'].units,
+                                        only_use_cftime_datetimes=False)
             
             # correcting for wind elevations from Johnson (1999) - Simple Expressions for
             # correcting wind speed data
@@ -718,7 +722,8 @@ class getObs:
                                    epochEnd=self.epochd2)
         
         if np.size(self.WLdataindex) > 1:
-            self.WLtime = nc.num2date(self.allEpoch[self.WLdataindex], self.ncfile['time'].units)
+            self.WLtime = nc.num2date(self.allEpoch[self.WLdataindex], self.ncfile['time'].units,
+                                      only_use_cftime_datetimes=False)
             self.WLpacket = {
                 'name':        str(self.ncfile.title),
                 'WL':          self.ncfile['waterLevel'][self.WLdataindex],
@@ -787,7 +792,8 @@ class getObs:
                 # self.wldataindex = np.expand_dims(self.wldataindex, axis=0)
                 
                 self.snaptime = nc.num2date(self.allEpoch[self.wldataindex],
-                                            self.ncfile['time'].units)
+                                            self.ncfile['time'].units,
+                                            only_use_cftime_datetimes=False)
                 try:
                     wl_coords = gp.FRFcoord(self.ncfile['longitude'][:], self.ncfile['latitude'][:])
                 except IndexError:
@@ -1134,7 +1140,8 @@ class getObs:
                                                                         self.ncfile['time'][idx],
                                                                         self.ncfile['time'].units)))
         print('Bathy is %s old' % (
-            self.d2 - nc.num2date(self.ncfile['time'][idx], self.ncfile['time'].units)))
+            self.d2 - nc.num2date(self.ncfile['time'][idx], self.ncfile['time'].units,
+                                  only_use_cftime_datetimes=False)))
         
         gridDict = {'xFRF':      xCoord,
                     'yFRF':      yCoord,
@@ -1555,7 +1562,7 @@ class getObs:
                    'lidarX':                self.ncfile['lidarX'][:],
                    'lidarY':                self.ncfile['lidarY'][:],
                    'time':                  nc.num2date(self.allEpoch[self.lidarIndex], self.ncfile['time'].units,
-                                                        self.ncfile['time'].calendar),
+                                                        self.ncfile['time'].calendar, only_use_cftime_datetimes=False),
                    'epochtime':             self.allEpoch[self.lidarIndex],
                    'totalWaterLevel':       self.ncfile['totalWaterLevel'][self.lidarIndex],
                    'elevation':             self.ncfile['elevation'][self.lidarIndex, :],
@@ -1656,7 +1663,7 @@ class getObs:
             depth = self.ncfile['depth'][idx]
             lat = self.ncfile['lat'][idx]
             lon = self.ncfile['lon'][idx]
-            time = nc.num2date(self.ncfile['time'][idx], self.ncfile['time'].units)
+            time = nc.num2date(self.ncfile['time'][idx], self.ncfile['time'].units, only_use_cftime_datetimes=False)
             temp = self.ncfile['waterTemperature'][idx]
             salin = self.ncfile['salinity'][idx]
             soundSpeed = self.ncfile['soundSpeed'][idx]
@@ -1762,13 +1769,13 @@ class getObs:
             alt_stationname = nc.chartostring(self.ncfile['station_name'][:])  # name of the station
             self.alt_timestart = nc.num2date(self.ncfile['timestart'][altdataindex],
                                              self.ncfile['timestart'].units,
-                                             self.ncfile['time'].calendar)
+                                             self.ncfile['time'].calendar, only_use_cftime_datetimes=False)
             self.alt_timeend = nc.num2date(self.ncfile['timeend'][altdataindex],
                                            self.ncfile['timeend'].units,
-                                           self.ncfile['time'].calendar)
+                                           self.ncfile['time'].calendar, only_use_cftime_datetimes=False)
             self.alt_time = nc.num2date(self.ncfile['time'][altdataindex],
                                         self.ncfile['time'].units,
-                                        self.ncfile['time'].calendar)
+                                        self.ncfile['time'].calendar, only_use_cftime_datetimes=False)
             for num in range(0, len(self.alt_time)):
                 self.alt_time[num] = self._roundtime(self.alt_time[num], roundto=1 * 60)
                 self.alt_timestart[num] = self._roundtime(self.alt_timestart[num], roundto=1 * 60)
@@ -1866,7 +1873,7 @@ class getObs:
             out = {'name':              nc.chartostring(self.ncfile['station_name'][:]),
                    'time':              nc.num2date(self.ncfile['time'][self.lidarIndex],
                                                     self.ncfile['time'].units,
-                                                    self.ncfile['time'].calendar),
+                                                    self.ncfile['time'].calendar, only_use_cftime_datetimes=False),
                    'lat':               self.ncfile['lidarLatitude'][:],  # Coordinates
                    'lon':               self.ncfile['lidarLongitude'][:],
                    'lidarX':            self.ncfile['lidarX'][:],
@@ -1947,19 +1954,11 @@ class getObs:
     
         self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=1 * 60)
-        self.idxDEM = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1, epochEnd=self.epochd2)
-        
-        if self.idxDEM is None:
-            try:
-                print(" last data point before your time {} DEM is {}".format(lidarLoc, nc.num2date(self.allEpoch[
-                      np.argwhere(self.allEpoch <self.epochd2).max().squeeze()], 'seconds since 1970-01-01',
-                                                 only_use_cftime_datetimes=False).strftime('%Y-%m-%dT%H%M%SZ')))
-            except (IndexError, ValueError):
-                print("   data didn't load")
-            return None
+        self.idxDEM = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
+                              epochEnd=self.epochd2)
         self.DEMtime = nc.num2date(self.allEpoch[self.idxDEM], 'seconds since 1970-01-01',
-                                    only_use_cftime_datetimes=False)
-    
+                                   only_use_cftime_datetimes=False)
+        
         if 'xbounds' in kwargs and np.array(kwargs['xbounds']).size == 2:
             if kwargs['xbounds'][0] > kwargs['xbounds'][1]:
                 kwargs['xbounds'] = np.flip(kwargs['xbounds'], axis=0)
@@ -2099,7 +2098,8 @@ class getObs:
                                            dtRound=30 * 60)
         self.cbidx = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1, epochEnd=self.epochd2)
         
-        self.cbtime = nc.num2date(self.allEpoch[self.cbidx], 'seconds since 1970-01-01')
+        self.cbtime = nc.num2date(self.allEpoch[self.cbidx], 'seconds since 1970-01-01',
+                                  only_use_cftime_datetimes=False)
         # mask = (time > start) & (time < end)
         # assert (emask == mask).all(), 'epoch time is not working'
         # idx = np.where(emask)[0] # this leaves a list that keeps the data iteratable with a
@@ -2266,7 +2266,8 @@ class getObs:
         else:
             ys = slice(None)
         try:
-            timeArgus = nc.num2date(self.allEpoch[self.idxArgus], 'seconds since 1970-01-01')
+            timeArgus = nc.num2date(self.allEpoch[self.idxArgus], 'seconds since 1970-01-01',
+                                    only_use_cftime_datetimes=False)
             Ip = self.ncfile['Ip'][self.idxArgus, xs, ys]
             out = {'time':      timeArgus,
                    'epochtime': self.allEpoch[self.idxArgus],
@@ -2481,7 +2482,7 @@ class getDataTestBed:
             northing = self.ncfile['northing'][:]
             easting = self.ncfile['easting'][:]
             
-            time = nc.num2date(self.ncfile['time'][idx], self.ncfile['time'].units)
+            time = nc.num2date(self.ncfile['time'][idx], self.ncfile['time'].units, only_use_cftime_datetimes=False)
             
             gridDict = {'xCoord':    xCoord,
                         'yCoord':    yCoord,
@@ -2704,7 +2705,8 @@ class getDataTestBed:
             self.epochd1 = oldD1epoch
         
         bathyT = nc.num2date(self.allEpoch[idx],
-                             'seconds since 1970-01-01')  # This one is rounded appropraitely
+                             'seconds since 1970-01-01', only_use_cftime_datetimes=False)  # This one is rounded
+        # appropraitely
         # this comes directly from file (useful if server is acting funny)
         # bathyT = nc.num2date(self.ncfile['time'][idx], 'seconds since 1970-01-01')
         
@@ -2872,40 +2874,47 @@ class getDataTestBed:
             yFRF = ncfile['yFRF'][y]
             if len(list) < 100:
                 dataVar = np.array(ncfile[var][np.squeeze(list)])
-                timeVar = nc.num2date(ncfile['time'][np.squeeze(list)], ncfile['time'].units)
+                timeVar = nc.num2date(ncfile['time'][np.squeeze(list)], ncfile['time'].units,
+                                      only_use_cftime_datetimes=False)
             else:
                 for num, minidx in enumerate(list):
                     if len(list) < 100:
                         dataVar = np.array(ncfile[var][np.squeeze(list)])
                         timeVar = nc.num2date(ncfile['time'][np.squeeze(list)],
-                                              ncfile['time'].units)
+                                              ncfile['time'].units,
+                                              only_use_cftime_datetimes=False)
                     elif num == 0:
                         dataVar = np.array(ncfile[var][range(minidx, list[num + 1]), y, x])
                         timeVar = nc.num2date(
                             np.array(ncfile['time'][range(minidx, list[num + 1])]),
-                            ncfile['time'].units)
+                            ncfile['time'].units,
+                            only_use_cftime_datetimes=False)
                     elif minidx == list[-1]:
                         lastIdx = (idx - minidx)[(idx - minidx) >= 0] + minidx
                         dataVar = np.append(dataVar, ncfile[var][lastIdx, y, x], axis=0)
                         timeVar = np.append(timeVar, nc.num2date(ncfile['time'][lastIdx],
-                                                                 ncfile['time'].units), axis=0)
+                                                                 ncfile['time'].units,
+                                                                 only_use_cftime_datetimes=False), axis=0)
                     else:
                         dataVar = np.append(dataVar,
                                             ncfile[var][range(minidx, list[num + 1]), y, x], axis=0)
                         timeVar = np.append(timeVar, nc.num2date(
                             ncfile['time'][range(minidx, list[num + 1])],
-                            ncfile['time'].units), axis=0)
+                            ncfile['time'].units,
+                            only_use_cftime_datetimes=False), axis=0)
         
         elif ncfile[var].ndim > 2:
             dataVar = ncfile[var][idx, y, x]
             xFRF = ncfile['xFRF'][x]
             yFRF = ncfile['yFRF'][y]
-            timeVar = nc.num2date(ncfile['time'][np.squeeze(idx)], ncfile['time'].units)
+            timeVar = nc.num2date(ncfile['time'][np.squeeze(idx)], ncfile['time'].units,
+                                  only_use_cftime_datetimes=False)
         else:  # probably bathymetry date variable
             dataVar = ncfile[var][idx]
             xFRF = ncfile['xFRF'][x]
             yFRF = ncfile['yFRF'][y]
-            timeVar = nc.num2date(ncfile['time'][np.squeeze(idx)], ncfile['time'].units)
+            timeVar = nc.num2date(ncfile['time'][np.squeeze(idx)], ncfile['time'].units,
+                                  only_use_cftime_datetimes=False)
         # package for output
         field = {'time':      timeVar,
                  'epochtime': ncfile['time'][idx],  # pulling down epoch time of interest
@@ -3057,7 +3066,8 @@ class getDataTestBed:
             if np.size(self.wavedataindex) >= 1:
                 wavespec = {'epochtime':   self.ncfile['time'][self.wavedataindex],
                             'time':        nc.num2date(self.allEpoch[self.wavedataindex],
-                                                       self.ncfile['time'].units),
+                                                       self.ncfile['time'].units,
+                                                       only_use_cftime_datetimes=False),
                             'name':        nc.chartostring(self.ncfile['station_name'][:]),
                             'wavefreqbin': self.ncfile['waveFrequency'][:],
                             # 'lat': self.ncfile['lat'][:],
@@ -3143,13 +3153,15 @@ class getDataTestBed:
                    ' to ' + self.end.strftime('%Y-%m-%dT%H%M%SZ')))
             return {}
         mod = {'epochtime':  ncfile['time'][dataIndex],
-               'time':       nc.num2date(ncfile['time'][dataIndex], ncfile['time'].units),
+               'time':       nc.num2date(ncfile['time'][dataIndex], ncfile['time'].units,
+                                         only_use_cftime_datetimes=False),
                'xFRF':       ncfile['xFRF'][:],
                'Hs':         ncfile['waveHs'][dataIndex, :],
                'zb':         ncfile['bottomElevation'][dataIndex, :].data,
                'WL':         ncfile['waterLevel'][dataIndex, :],
                'bathyTime':  nc.num2date(ncfile['bathymetryDate'][dataIndex],
-                                         ncfile['bathymetryDate'].units),
+                                         ncfile['bathymetryDate'].units,
+                                         only_use_cftime_datetimes=False),
                'setup':      ncfile['setup'][dataIndex, :],
                'aveN':       ncfile['aveN'][dataIndex, :],
                'stdN':       ncfile['stdN'][dataIndex, :],
