@@ -1881,7 +1881,6 @@ class getObs:
                    'xFRF':              self.ncfile['xFRF'][:],
                    'yFRF':              self.ncfile['yFRF'][:],
                    'waveFrequency':     self.ncfile['waveFrequency'][:],
-            
                    'hydroQCflag':       self.ncfile['hydrodynamicsFlag'][self.lidarIndex],
                    'waterLevel':        self.ncfile['waterLevel'][self.lidarIndex, :],
                    'waveHs':            self.ncfile['waveHs'][self.lidarIndex, :],
@@ -1926,8 +1925,8 @@ class getObs:
             print('There is no LIDAR data during this time period')
             out = None
         return out
-
-    def getLidarDEM(self, **kwargs):
+    
+    def getLidarTopo(self, **kwargs):
         """This function will get the lidar DEM data, beach topography data.
 
         Args: None
@@ -2002,14 +2001,13 @@ class getObs:
             ys = slice(None)
         
         DEMdata = {
-                'xFRF':      self.ncfile['xFRF'][xs],
-                'yFRF':      self.ncfile['yFRF'][ys],
-                'elevation': self.ncfile['elevation'][self.idxDEM, ys, xs],
-                'time':      self.DEMtime,
-                'epochtime': self.allEpoch[self.idxDEM],
-                'lat':       self.ncfile['latitude'][ys, xs],
-                'lon':       self.ncfile['longitude'][ys,xs]
-                }
+            'time': self.DEMtime,
+            'epochtime': self.allEpoch[self.idxDEM],
+            'xFRF': self.ncfile['xFRF'][xs],
+            'yFRF': self.ncfile['yFRF'][ys],
+            'elevation': self.ncfile['elevation'][self.idxDEM, ys, xs]
+        }
+        
         return DEMdata
     
     def getBathyRegionalDEM(self, utmEmin, utmEmax, utmNmin, utmNmax):
