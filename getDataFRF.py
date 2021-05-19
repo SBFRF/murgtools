@@ -70,7 +70,7 @@ def getnc(dataLoc, callingClass, dtRound=60, **kwargs):
     start = kwargs.get('start', None)
     end = kwargs.get('end', None)
     server = kwargs.get('server', None)
-    FRFdataloc = u'http://134.164.129.55/thredds/dodsC/'
+    FRFdataloc = u'http://134.164.129.55:8080/thredds/dodsC/'
     chlDataLoc = u'https://chldata.erdc.dren.mil/thredds/dodsC/'
     # a list of data sets (just the ncml) that shouldn't drill down to monthly file
     doNotDrillList = ['survey']
@@ -95,7 +95,7 @@ def getnc(dataLoc, callingClass, dtRound=60, **kwargs):
     
     # now set URL for netCDF file call,
     if start is None and end is None:
-        ncfileURL = urljoin(THREDDSloc, pName, dataLoc)
+        ncfileURL = urljoin('[FillMismatch]'+THREDDSloc, pName, dataLoc)
     elif isinstance(start, float) and isinstance(end, float):  # then we assume epoch
         raise NotImplementedError(
             'check conversion for floats (epoch time), currently needs to be datetime object')
@@ -128,6 +128,7 @@ def getnc(dataLoc, callingClass, dtRound=60, **kwargs):
     # ___________________ go now to open file   ___________________________________________
     finished, n, maxTries = False, 0, 3  # initializing variables to iterate over
     ncFile, allEpoch = None, None  # will return None's when URL doesn't exist
+    print(ncfileURL)
     while not finished and n < maxTries:
         try:
             ncFile = nc.Dataset(ncfileURL)  # get the netCDF file
@@ -339,6 +340,7 @@ class getObs:
                             'Hs':          self.ncfile['waveHs'][self.wavedataindex],
                             'peakf':       1 / self.ncfile['waveTp'][self.wavedataindex],
                 }
+                wavespec['units'] = {'Hs':self.ncfile['waveHs'].units,'peakf':'Hz','wavefreqbin':'Hz'}
 
                 # now do directionalWaveGaugeList gauge try
                 try:  # pull time specific data based on self.wavedataindex
@@ -349,15 +351,21 @@ class getObs:
                     if spec is True:
                         wavespec['dWED'] = self.ncfile['directionalWaveEnergyDensity'][self.wavedataindex, :, :]
                         wavespec['fspec'] = self.ncfile['waveEnergyDensity'][self.wavedataindex, :]
+                        wavespec['units']['dWED'] = self.ncfile['directionalWaveEnergyDensity'].units
+                        wavespec['units']['fspec'] = self.ncfile['waveEnergyDensity'].units
 
                         if wavespec['dWED'].ndim < 3:
                             wavespec['dWED'] = np.expand_dims(wavespec['dWED'], axis=0)
                             wavespec['fspec'] = np.expand_dims(wavespec['fspec'], axis=0)
-
+                            wavespec['units']['dWED'] = self.ncfile['directionalWaveEnergyDensity'].units
+                            wavespec['units']['fspec'] = self.ncfile['waveEnergyDensity'].units
 
                     wavespec['waveDp'] = self.ncfile['wavePeakDirectionPeakFrequency'][self.wavedataindex]
                     wavespec['waveDm'] = self.ncfile['waveMeanDirection'][self.wavedataindex]
                     wavespec['Tm'] = self.ncfile['waveTm'][self.wavedataindex]
+                    wavespec['units']['waveDp'] = self.ncfile['wavePeakDirectionPeakFrequency'].units
+                    wavespec['units']['waveDm'] = self.ncfile['waveMeanDirection'].units
+                    wavespec['units']['Tm'] = self.ncfile['waveTm'].units
 
                     if returnAB is True:
                         wavespec['a1'] = self.ncfile['waveA1Value'][self.wavedataindex, :]
@@ -2301,7 +2309,7 @@ class getObs:
 
 class getDataTestBed:
     """Retrieves model data."""
-    def __init__(self, d1, d2):
+    def __init__(self, d1, d2,**kwargs):
         """Initialization description here.
         
         Data are returned in self.datainex are inclusive at d1,d2
@@ -2321,9 +2329,10 @@ class getDataTestBed:
         #     else:
         #         self.THREDDS = 'CHL'
         #
+        self.server = kwargs.get('server', None)
         self.callingClass = 'getDataTestBed'
-        self.FRFdataloc = u'http://134.164.129.55/thredds/dodsC/FRF/'
-        self.crunchDataLoc = u'http://134.164.129.55/thredds/dodsC/cmtb/'
+        self.FRFdataloc = u'http://134.164.129.55:8080/thredds/dodsC/FRF/'
+        self.crunchDataLoc = u'http://134.164.129.55:8080/thredds/dodsC/cmtb/'
         self.chlDataLoc = u'https://chlthredds.erdc.dren.mil/thredds/dodsC/frf/'
         
         assert type(self.end) == DT.datetime, 'end dates need to be in python "Datetime" data types'
@@ -2351,6 +2360,7 @@ class getDataTestBed:
         # TODO find a way to pull only hourly data or regular interval of desired time
         # todo this use date2index and create a list of dates see help(nc.date2index)
         try:
+            print(self.crunchDataLoc + self.dataloc)
             self.ncfile = nc.Dataset(
                 self.crunchDataLoc + self.dataloc)  # loads all of the netCDF file
             #            try:
@@ -3073,8 +3083,9 @@ class getDataTestBed:
             gname = 'There Are no Gauge numbers here'
             raise NameError('Bad Gauge name, specify proper gauge name/number')
         # parsing out data of interest in time
+
         self.dataloc = urlFront + '/' + fname
-        self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass, dtRound=1 * 60)
+        self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass, dtRound=1 * 60,server=self.server)
         try:
             # go get indices of interest
             self.wavedataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
@@ -3101,12 +3112,18 @@ class getDataTestBed:
                             'WL':          self.ncfile['waterLevel'][self.wavedataindex],
                             'qcFlagWL':    self.ncfile['qcFlag'][self.wavedataindex, 2],
                             'qcFlagWind':  self.ncfile['qcFlag'][self.wavedataindex, 1]}
+                wavespec['units'] = {'Hs':self.ncfile['waveHs'].units,
+                        'dWED':self.ncfile['directionalWaveEnergyDensity'].units,
+                        'waveDm':self.ncfile['waveDm'].units,'waveTm':self.ncfile['waveTm'].units,
+                        'waveTp':self.ncfile['waveTm'].units,'WL':self.ncfile['waterLevel'].units}
                 # make frequency spectra from directional energy spectrum
                 wavespec['fspec'] = wavespec['dWED'].sum(axis=2) * np.median(
                     np.diff(np.array(wavespec['wavedirbin'])))
                 if model == 'STWAVE':
                     wavespec['Umag'] = self.ncfile['Umag'][self.wavedataindex]
                     wavespec['Udir'] = self.ncfile['Udir'][self.wavedataindex]
+                    wavespec['units']['Umag'] = self.ncfile['Umag'].units
+                    wavespec['units']['Udir'] = self.ncfile['Udir'].units
                 wavespec['dWED'][wavespec['dWED'] == 0] = 1e-6
                 wavespec['fspec'][wavespec['fspec'] == 0] = 1e-6
             qcFlags = self.ncfile['qcFlag'][self.wavedataindex]
