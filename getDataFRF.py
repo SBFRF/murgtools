@@ -1201,7 +1201,11 @@ class getObs:
                 4.5m AWAC        can be [5, 'awac-4.5m', 'Awac-4.5m']
 
                 3.5m aquadopp    can be [6, 'adop-3.5m', 'aquadopp 3.5m']
-
+                
+                340m pressure    can be ['xp340m', 'xp340']
+                
+                250m pressure    can be ['8', 'xp250m', 'xp250']
+                
                 200m pressure    can be [8, 'xp200m', 'xp200']
 
                 150m pressure    can be [9, 'xp150m', 'xp150']
@@ -1214,6 +1218,29 @@ class getObs:
 
                 oregon inlet WR  can be ['oregonInlet', 'OI', 'oi']
 
+                signature @ yFRF 940 xFRF 300 can be ['sig940-300', '940-300']
+                
+                signature @ yFRF 769 xFRF 300 can be ['sig769-300', '769-300']
+                
+                pressure @ yFRF 940 xFRF 200 can be ['paros-200-940m', 'paros-200-940m']
+            
+                pressure @ yFRF 940 xFRF 200 can be ['paros-200-940m', 'paros-200-940m']
+
+                lidar wave gauge @ xFRF 140 can be ['lidarwavegauge140', 'lidargauge140', 'lidarwavegauge140m',
+                                                    'lidargauge140m']
+                                                    
+                lidar wave gauge @ xFRF 110 can be ['lidarwavegauge110', 'lidargauge110', 'lidarwavegauge110m',
+                                                    'lidargauge110m']
+                
+                lidar wave gauge @ xFRF 100 can be ['lidarwavegauge100', 'lidargauge100', 'lidarwavegauge100m',
+                                                    'lidargauge100m']
+                
+                lidar wave gauge @ xFRF 90 can be ['lidarwavegauge90', 'lidargauge90', 'lidarwavegauge90m',
+                                                   'lidargauge90m']
+                                                   
+                lidar wave gauge @ xFRF 80 can be ['lidarwavegauge80', 'lidargauge80', 'lidarwavegauge80m',
+                                                   'lidargauge80m']
+                
         Returns:
           Nothing, this just sets the self.dataloc data member
 
@@ -1237,6 +1264,10 @@ class getObs:
             self.dataloc = 'oceanography/waves/adop-3.5m/adop-3.5m.ncml'
         elif str(gaugenumber).lower() in ['7', 'adop-2m']:
             self.dataloc = 'oceanography/waves/adop01/adop01.ncml'
+        elif str(gaugenumber).lower() in ['xp340m', 'xp340']:
+            self.dataloc = "oceanography/waves/xp340m/xp340m.ncml"
+        elif str(gaugenumber).lower() in ['8', 'xp250m', 'xp250']:
+            self.dataloc = 'oceanography/waves/xp250m/xp250m.ncml'
         elif str(gaugenumber).lower() in ['8', 'xp200m', 'xp200']:
             self.dataloc = 'oceanography/waves/xp200m/xp200m.ncml'
         elif str(gaugenumber).lower() in ['9', 'xp150m', 'xp150']:
@@ -1247,7 +1278,16 @@ class getObs:
             self.dataloc = 'oceanography/waves/xp100m/xp100m.ncml'
         elif str(gaugenumber).lower() in ['12', '8m array', '8m-array']:
             self.dataloc = 'oceanography/waves/8m-array/8m-array.ncml'
-        # lidar wave gauges - 140 m
+        elif str(gaugenumber).lower() in ['sig940-300', '940-300']:
+            self.dataloc = 'oceanography/waves/sig940-300/sig940-300.ncml'
+        elif str(gaugenumber).lower() in ['sig769-300', '769-300']:
+            self.dataloc = 'oceanography/waves/sig769-300/sig769-300.ncml'
+        elif str(gaugenumber).lower() in ['paros-200-940m', 'paros-200-940m']:
+            self.dataloc = 'oceanography/waves/paros-200-940m/paros-200-940m.ncml'
+        elif str(gaugenumber).lower() in ['paros-200-940m', 'paros-200-940m']:
+            self.dataloc = 'oceanography/waves/paros-250-940m/paros-250-940m.ncml'
+
+        # lidar wave gauges
         elif str(gaugenumber).lower() in ['lidarwavegauge140', 'lidargauge140',
                                           'lidarwavegauge140m', 'lidargauge140m']:
             self.dataloc = 'oceanography/waves/lidarWaveGauge140/lidarWaveGauge140.ncml'
@@ -1280,6 +1320,8 @@ class getObs:
             self.dataloc = "oceanography/waves/lidarWaveGauge110/lidarWaveGauge110.ncml"
         elif str(gaugenumber).lower() in ['lidarwavegauge140']:
             self.dataloc = "oceanography/waves/lidarWaveGauge140/lidarWaveGauge140.ncml"
+
+
         else:
             self.gname = 'There Are no Gauge numbers here'
             raise NameError('Bad Gauge name, specify proper gauge name/number, or add capability')
