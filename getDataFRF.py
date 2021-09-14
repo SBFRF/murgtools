@@ -951,10 +951,11 @@ class getObs:
             idx = np.argwhere(
                 self.ncfile['surveyNumber'][indexRef[0]:indexRef[1]] == self.ncfile['surveyNumber'][idxSingle]).squeeze() + indexRef[0]
             if np.size(idx) == 0:
-                print('The closest in history to your start date is %s\n' % nc.num2date(
-                    self.gridTime[idx],
-                    self.ncfile['time'].units))
-                raise NotImplementedError('Please End new simulation with the date above')
+                #mwf fails
+                #print('The closest in history to your start date is %s\n' % nc.num2date(
+                #    self.gridTime[idx],
+                #    self.ncfile['time'].units))
+                raise NotImplementedError('empty index')
                 idx = self.bathydataindex
         
         # else:
