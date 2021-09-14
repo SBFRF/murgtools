@@ -2047,10 +2047,10 @@ class getObs:
             self.dataloc = 'geomorphology/DEMs/duneLidarDEM/duneLidarDEM.ncml'
         elif lidarLoc.lower() in ['claris']:
             self.dataloc = '/remote_sensing_temp/clarisDEMs.ncml'
-            print('  Warning: claris data are coming from Temp Directory' )
+            print('  Warning: claris data are coming from Temp Directory')
         else:
             raise NotImplementedError('valid lidar locs are "dune" and "pier" and "claris"')
-    
+
         self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=1 * 60)
         self.idxDEM = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
