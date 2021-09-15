@@ -437,16 +437,15 @@ class getObs:
                             'name': str(self.ncfile.title), }"""
 
     def getWaveSpec(self, gaugenumber=0, roundto=30, removeBadDataFlag=4, **kwargs):
-        print("WARNING: getWaveSpec is depreciated, update to use getWaveData.")
+        warnings.warn("WARNING: getWaveSpec is depreciated, update to use getWaveData, spec=True")
         returnAB = kwargs.get('returnAB', False)
         specOnly = kwargs.get('specOnly', False)
-        if specOnly:
-            wavedata = self.getWaveData(gaugenumber, roundto, removeBadDataFlag, returnAB=returnAB, spec=True)
-            wavedict['dWED'] = wavedata['dWED']
-            wavedict['fspec'] = wavedata['fspec']
-            return wavedict
-        else:
-            return self.getWaveData(gaugenumber, roundto, removeBadDataFlag, returnAB=returnAB, spec=True)
+        # if specOnly:
+        #     wavedata = self.getWaveData(gaugenumber, roundto, removeBadDataFlag, returnAB=returnAB, spec=True)
+        #     # work around
+        #     return wavedata
+        # else:
+        return self.getWaveData(gaugenumber, roundto, removeBadDataFlag, returnAB=returnAB, spec=True)
 
     def getCurrents(self, gaugenumber=5, roundto=1):
         """This function pulls down the currents data from the Thredds Server.
