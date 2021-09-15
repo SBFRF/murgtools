@@ -2826,7 +2826,8 @@ class getDataTestBed:
                     'time':      bathyT,
                     'lat':       lat,
                     'lon':       lon, }
-        if ('cBKF_T' not in kwargs) and (f'cBKF' not in kwargs):  # then its a survey, get the survey number
+        # then its a survey, get the survey number
+        if ('cBKF_T' not in kwargs) and ('cBKF' not in kwargs):
             gridDict['surveyNumber'] = self.ncfile['surveyNumber'][idx]
         
         return gridDict
