@@ -1282,12 +1282,13 @@ class getObs:
             self.dataloc = 'oceanography/waves/sig940-300/sig940-300.ncml'
         elif str(gaugenumber).lower() in ['sig769-300', '769-300']:
             self.dataloc = 'oceanography/waves/sig769-300/sig769-300.ncml'
-        elif str(gaugenumber).lower() in ['paros-200-940m', 'paros-200-940m']:
+        elif str(gaugenumber).lower() in ['paros-200-940m']:
             self.dataloc = 'oceanography/waves/paros-200-940m/paros-200-940m.ncml'
-        elif str(gaugenumber).lower() in ['paros-200-940m', 'paros-200-940m']:
+        elif str(gaugenumber).lower() in ['paros-250-940m']:
             self.dataloc = 'oceanography/waves/paros-250-940m/paros-250-940m.ncml'
-
-        # lidar wave gauges
+        elif str(gaugenumber).lower() in ['paros-340x-940y-top']:
+            self.dataloc = 'oceanography/waves/paros-340x-940y-top/paros-340x-940y-top.ncml'
+        # lidar wave gauges - 140 m
         elif str(gaugenumber).lower() in ['lidarwavegauge140', 'lidargauge140',
                                           'lidarwavegauge140m', 'lidargauge140m']:
             self.dataloc = 'oceanography/waves/lidarWaveGauge140/lidarWaveGauge140.ncml'
