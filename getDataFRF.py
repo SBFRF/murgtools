@@ -130,7 +130,7 @@ def getnc(dataLoc, callingClass, epoch1=0,epoch2=0, dtRound=60, cutrange=100000,
     finished, n, maxTries = False, 0, 3  # initializing variables to iterate over
     ncFile, allEpoch = None, None  # will return None's when URL doesn't exist
     print(ncfileURL)
-
+    indexRef = [0]
     while not finished and n < maxTries:
         try:
             ncFile = nc.Dataset(ncfileURL)  # get the netCDF file
@@ -1576,11 +1576,12 @@ class getObs:
             loc_dict[timestamp] = self.get_sensor_locations_from_thredds()  # timestamp)
             with open(datafile, 'wb') as fid:
                 pickle.dump(loc_dict, fid)
-        
+        # remove time stamps
+        # available_timestamps = np.array([s.replace(tzinfo=None) for s in loc_dict.keys()])
         available_timestamps = np.array(list(loc_dict.keys()))
-        idx = np.abs(self.d1 - available_timestamps).argmin()
+        idx = np.abs(self.d1.astimezone(DT.timezone.utc) - available_timestamps).argmin()
         nearest_timestamp = available_timestamps[idx]
-        if abs(self.d1 - nearest_timestamp).days < window_days:
+        if abs(self.d1.astimezone(DT.timezone.utc) - nearest_timestamp).days < window_days:
             # if there is data, and its within the window
             archived_sensor_locations = loc_dict[nearest_timestamp]
             # MPG: only use locations specified in self.waveGaugeList (for the case
