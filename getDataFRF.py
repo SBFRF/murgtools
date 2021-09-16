@@ -47,7 +47,7 @@ def gettime(allEpoch, epochStart, epochEnd, indexRef=0):
     finally:
         return idx
 
-def getnc(dataLoc, callingClass, epoch1=0,epoch2=0, dtRound=60, cutrange=100000,**kwargs):
+def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=60, cutrange=100000,**kwargs):
     """Function grabs the netCDF file interested.
     
     Responsible for drilling down to specific monthly file if applicable to speed things up.
@@ -139,6 +139,8 @@ def getnc(dataLoc, callingClass, epoch1=0,epoch2=0, dtRound=60, cutrange=100000,
                 idts = [0,tt.shape[0]]
                 res1 = 0
                 res2 = 1
+                indexRef = [idts[res1], idts[res2]]  # define a refined time window to return
+                allEpoch = ncFile['time'][idts[res1]:idts[res2]]
             else:
                 idts = np.arange(0, tt.shape[0], cutrange)
                 temp = tt[idts]  # pull times that are stepped by cutrange
@@ -148,7 +150,7 @@ def getnc(dataLoc, callingClass, epoch1=0,epoch2=0, dtRound=60, cutrange=100000,
                     res2 = np.max([idx for idx, val in enumerate(temp) if val < epoch2]) + 1
                     indexRef = [idts[res1], idts[res2]]  # define a refined time window to return
                     allEpoch = ncFile['time'][idts[res1]:idts[res2]]
-                else:  # there is no relevant data in my window, take the last "cutrange" of values 
+                else:  # there is no relevant data in my window, take the last "cutrange" of values
                     indexRef = [-cutrange, len(tt)]
                     allEpoch = ncFile['time'][-cutrange: len(tt)]
             finished = True
@@ -2060,9 +2062,18 @@ class getObs:
         self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=1 * 60, server=self.server)
         self.idxDEM = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1, epochEnd=self.epochd2)
+
+        if self.idxDEM is None:
+            try:
+                print(" last data point before your time {} DEM is {}".format(lidarLoc, nc.num2date(self.allEpoch[
+                      np.argwhere(self.allEpoch < self.epochd2).max().squeeze()], 'seconds since 1970-01-01',
+                                                 only_use_cftime_datetimes=False).strftime('%Y-%m-%dT%H%M%SZ')))
+            except (IndexError, ValueError):
+                print("   data didn't load")
+            return None
         self.DEMtime = nc.num2date(self.allEpoch[self.idxDEM], 'seconds since 1970-01-01',
                                    only_use_cftime_datetimes=False)
-        
+
         if 'xbounds' in kwargs and np.array(kwargs['xbounds']).size == 2:
             if kwargs['xbounds'][0] > kwargs['xbounds'][1]:
                 kwargs['xbounds'] = np.flip(kwargs['xbounds'], axis=0)
