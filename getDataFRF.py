@@ -914,7 +914,7 @@ class getObs:
         # acceptableProfileNumbers = [None, ]
         self.dataloc = 'geomorphology/elevationTransects/survey/surveyTransects.ncml'  # location
         # of the gridded surveys
-        dataReturns = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
+        dataReturns = getnc(dataLoc=self.dataloc, callingClass=self.callingClass, server=self.server,
                                            dtRound=1 * 60, epoch1=self.epochd1, epoch2=self.epochd2)
         if len(dataReturns) == 2:
             self.ncfile = dataReturns[0]
