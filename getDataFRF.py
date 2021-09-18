@@ -914,11 +914,19 @@ class getObs:
         # acceptableProfileNumbers = [None, ]
         self.dataloc = 'geomorphology/elevationTransects/survey/surveyTransects.ncml'  # location
         # of the gridded surveys
-        self.ncfile, self.allEpoch, indexRef= getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
-                                           dtRound=1 * 60,epoch1=self.epochd1,epoch2=self.epochd2)
+        dataReturns = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
+                                           dtRound=1 * 60, epoch1=self.epochd1, epoch2=self.epochd2)
+        if len(dataReturns) == 2:
+            self.ncfile = dataReturns[0]
+            self.allEpoch = dataReturns[1]
+            indexRef=0
+        elif len(dataReturns) == 3:
+            self.ncfile = dataReturns[0]
+            self.allEpoch = dataReturns[1]
+            indexRef = dataReturns[2]
         try:
             self.bathydataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
-                                          epochEnd=self.epochd2,indexRef=indexRef[0])
+                                          epochEnd=self.epochd2, indexRef=indexRef[0])
         except IOError:  # when data are not on CHL thredds
             self.bathydataindex = None
         # returning None object is convention and must be followed/handled down the line
