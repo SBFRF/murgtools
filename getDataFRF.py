@@ -73,7 +73,7 @@ def getnc(dataLoc, callingClass, dtRound=60, **kwargs):
     FRFdataloc = u'http://134.164.129.55:8080/thredds/dodsC/'
     chlDataLoc = u'https://chldata.erdc.dren.mil/thredds/dodsC/'
     # a list of data sets (just the ncml) that shouldn't drill down to monthly file
-    doNotDrillList = ['survey']
+    doNotDrillList = ['survey', 'integratedBathyTopo']
 
     # chose which server to select based on IP
     ipAddress = socket.gethostbyname(socket.gethostname())
@@ -2527,7 +2527,7 @@ class getDataTestBed:
             return gridDict
     
     def getBathyIntegratedTransect(self, method=1, ForcedSurveyDate=None, **kwargs):
-        """This function gets the integraated bathy, using the plant (2009) method.
+        """This function gets the integraated bathy of varying types.
 
         Args:
             method (int): a key which determines which method to find bathymetry with (Default
@@ -2543,10 +2543,14 @@ class getDataTestBed:
                 ybounds
 
         Keyword Args:
-           'cBKF': if true will get cBathy original Kalman Filter
+            'type': key word that defines which bathy to use available types are below
+            
+                'cBKF': if true will get cBathy original Kalman Filter
 
-           'cBKF_T': if true will get wave height thresholded Kalman filter
+                'cBKF_T': if true will get wave height thresholded Kalman filter
 
+                'bathyTopo': fuzed bathy topopgrahy (inital method is simple linear interp)
+                
             'xbound': = [xmin, xmax]  which will truncate the cbathy domain to xmin, xmax (frf
             coord)
 
@@ -2584,7 +2588,7 @@ class getDataTestBed:
         forceReturnAll = kwargs.get('forceReturnAll', False)  # returns all survey
         forceReturnAllPlusOne = kwargs.get('forceReturnAllPlusOne', False)  # returns all surveys
         verbose = kwargs.get('verbose', False)
-        
+        type = kwargs.get('type', None)
         if ForcedSurveyDate != None:
             # start is used in the gettime function,
             # to force a selection of survey date self.start/end is changed to the forced
@@ -2603,12 +2607,17 @@ class getDataTestBed:
         ####################################################################
         #  Set URL based on Keyword, Default to surveyed bathymetry        #
         ####################################################################
-        if 'cBKF_T' in kwargs and kwargs['cBKF_T'] == True:
-            self.dataloc = 'integratedBathyProduct/cBKF-T/cBKF-T.ncml'
-        elif 'cBKF' in kwargs and kwargs['cBKF'] == True:
-            self.dataloc = 'integratedBathyProduct/cBKF/cBKF.ncml'
-        else:
+        if type is None:
             self.dataloc = 'integratedBathyProduct/survey/survey.ncml'
+
+        elif type in ['cBKF_T']:
+            self.dataloc = 'integratedBathyProduct/cBKF-T/cBKF-T.ncml'
+        elif type in ['cBKF']:
+            self.dataloc = 'integratedBathyProduct/cBKF/cBKF.ncml'
+        elif type.lower() in ['bathytopo']:
+            self.dataloc = 'integratedBathyProduct/integratedBathyTopo/integratedBathyTopo.ncml'
+        else:
+            raise NotImplementedError('Need new call. .. not in list ')
         ####################################################################
         #   go get the index and return based on method chosen             #
         ####################################################################
