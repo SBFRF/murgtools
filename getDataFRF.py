@@ -147,7 +147,7 @@ def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=60, cutrange=100000
                 # now search across those times
                 if np.argwhere(temp > epoch1).any():
                     res1 = np.min([idx for idx, val in enumerate(temp) if val > epoch1]) - 1
-                    res2 = np.max([idx for idx, val in enumerate(temp) if val < epoch2]) 
+                    res2 = np.max([idx for idx, val in enumerate(temp) if val < epoch2])
                     indexRef = [idts[res1], idts[res2]]  # define a refined time window to return
                     allEpoch = ncFile['time'][idts[res1]:idts[res2]]
                 else:  # there is no relevant data in my window, take the last "cutrange" of values
@@ -933,25 +933,31 @@ class getObs:
                 indexRef[1] = self.ncfile['time'].shape[0]
         # logic to handle no transects in date range
         if forceReturnAll == True:
+            # return everything found in window
             idx = self.bathydataindex
         elif np.size(self.bathydataindex) == 1 and self.bathydataindex is not None:
+            # identifed single survey point that fits time window
             idx = self.bathydataindex
-        elif (np.size(self.bathydataindex) < 1 & method == 1) or (
+        elif ((np.size(self.bathydataindex) < 1) or (self.bathydataindex is None) & method == 1) or (
             self.bathydataindex is None and method == 1):
-            # there's no exact bathy match so find the max negative number where the negative
-            # numbers are historical and the max would be the closest historical
+            # there's no exact bathy match so find the closest in history
+            # find the max negative number where the negative numbers are historical and the max would be the
+            # closest historical
             temp = self.ncfile['time'][indexRef[0]:indexRef[1]]
             val = (max([n for n in (temp - self.epochd1) if n < 0]))
             idx = np.where((temp - self.epochd1) == val)[0][0] + indexRef[0]
-            # print 'Bathymetry is taken as closest in HISTORY - operational'
-        elif (np.size(self.bathydataindex) < 1 and method == 0) or (
+            
+        elif ((np.size(self.bathydataindex) < 1) or (self.bathydataindex is None) and method == 0) or (
             self.bathydataindex is None and method == 1):
+            # no exact bathy, find the closest in time
             temp = self.ncfile['time'][indexRef[0]:indexRef[1]]
             idx = np.argmin(np.abs(temp - self.d1)) + indexRef[0]  # closest in time
-            # print 'Bathymetry is taken as closest in TIME - NON-operational'
+            
         elif np.size(self.bathydataindex) > 1:  # if dates fall into d1,d2 bounds,
             idx = self.bathydataindex[0]  # return a single index. this means there was a survey between d1,d2
-
+        else:
+            raise NotImplementedError("you've out thought me -- getdatatestbed.getDataFRF.getobs.getbathytransect")
+        
         if forceReturnAll is not True:
             # find the whole survey (via surveyNumber) and assign idx to return the whole survey
             idxSingle = idx
@@ -984,16 +990,7 @@ class getObs:
             idx2mask = np.in1d(self.ncfile['profileNumber'][idx],
                                profilenumbers)  # boolean true/false of time and profile number
             idx = idx[idx2mask]
-        # elif pd.Series(profileNumbers).isin(np.unique(self.cshore_ncfile['profileNumber'][
-        # :])).any(): #if only some
-        # of the profile numbers match
-        #     print 'One or more input profile numbers do not match those in the FRF transects!
-        #     Fetching data for
-        #     those that do.'
-        #     mask = (self.alltime >= self.start) & (self.alltime < self.end) & np.in1d(
-        #     self.cshore_ncfile[
-        #     'profileNumber'][:],profileNumbers)  # boolean true/false of time and profile number
-        
+
         # now retrieve data with idx
         if np.size(idx) > 0 and idx is not None:
             elevation_points = self.ncfile['elevation'][idx]
