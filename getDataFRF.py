@@ -147,7 +147,7 @@ def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=60, cutrange=100000
                 # now search across those times
                 if np.argwhere(temp > epoch1).any():
                     res1 = np.min([idx for idx, val in enumerate(temp) if val > epoch1]) - 1
-                    res2 = np.max([idx for idx, val in enumerate(temp) if val < epoch2]) + 1
+                    res2 = np.max([idx for idx, val in enumerate(temp) if val < epoch2]) 
                     indexRef = [idts[res1], idts[res2]]  # define a refined time window to return
                     allEpoch = ncFile['time'][idts[res1]:idts[res2]]
                 else:  # there is no relevant data in my window, take the last "cutrange" of values
