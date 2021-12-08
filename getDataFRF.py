@@ -951,7 +951,7 @@ class getObs:
             self.bathydataindex is None and method == 1):
             # no exact bathy, find the closest in time
             temp = self.ncfile['time'][indexRef[0]:indexRef[1]]
-            idx = np.argmin(np.abs(temp - self.d1)) + indexRef[0]  # closest in time
+            idx = np.argmin(np.abs(temp - self.epochd1)) + indexRef[0]  # closest in time
             
         elif np.size(self.bathydataindex) > 1:  # if dates fall into d1,d2 bounds,
             idx = self.bathydataindex[0]  # return a single index. this means there was a survey between d1,d2
