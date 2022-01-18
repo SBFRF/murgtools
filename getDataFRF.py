@@ -968,7 +968,7 @@ class getObs:
                 #print('The closest in history to your start date is %s\n' % nc.num2date(
                 #    self.gridTime[idx],
                 #    self.ncfile['time'].units))
-                raise NotImplementedError('empty index')
+                raise NotImplementedError('empty index: Could be transient server error')
                 idx = self.bathydataindex
         
         # else:
