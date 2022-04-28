@@ -2844,7 +2844,7 @@ class getDataTestBed:
                     'lat':       lat,
                     'lon':       lon, }
         # then its a survey, get the survey number
-        if ('cBKF_T' not in kwargs) and ('cBKF' not in kwargs):
+        if 'surveyNumber' in self.ncfile.variables.keys():
             gridDict['surveyNumber'] = self.ncfile['surveyNumber'][idx]
         
         return gridDict
