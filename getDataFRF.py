@@ -2746,9 +2746,13 @@ class getDataTestBed:
         elif (self.bathydataindex == None or len(self.bathydataindex) < 1) & method == 1:
             # there's no exact bathy match so find the max negative number where the negitive
             # numbers are historical and the max would be the closest historical
-            val = (max([n for n in (self.ncfile['time'][:] - self.epochd1) if n < 0]))
-            idx = np.where((self.ncfile['time'][:] - self.epochd1) == val)[0][0]
-            print('Bathymetry is taken as closest in HISTORY - operational')
+            try:
+                val = (max([n for n in (self.ncfile['time'][:] - self.epochd1) if n < 0]))
+                idx = np.where((self.ncfile['time'][:] - self.epochd1) == val)[0][0]
+                print('Bathymetry is taken as closest in HISTORY - operational')
+            except ValueError:
+                raise NotImplementedError('need bathy that is historical to dates selected ')
+            
         elif (self.bathydataindex == None or np.size(self.bathydataindex) < 1) and method == 0:
             idx = np.argmin(np.abs(self.ncfile['time'][:] - self.epochd1))  # closest in time
             print('Bathymetry is taken as closest in TIME - NON-operational')
