@@ -320,7 +320,8 @@ class getObs:
         self._waveGaugeURLlookup(gaugenumber)
         # parsing out data of interest in time
         self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
-                                           dtRound=roundto * 60, start=self.d1, end=self.d2, server=self.server)
+                                           dtRound=roundto * 60, epoch1=self.epochd1, epoch2=self.epochd2,
+                                           start=self.d1, end=self.d2, server=self.server)
         try:
             self.wavedataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
                                          epochEnd=self.epochd2)
@@ -360,9 +361,15 @@ class getObs:
                             'lon':         self.ncfile['longitude'][:],
                             'depth':       depth,
                             'Hs':          self.ncfile['waveHs'][self.wavedataindex],
-                            'peakf':       1 / self.ncfile['waveTp'][self.wavedataindex],
                 }
-                wavespec['units'] = {'Hs':self.ncfile['waveHs'].units,'peakf':'Hz','wavefreqbin':'Hz'}
+                if 'waveTp' in self.ncfile.variables.keys():
+                    wavespec['peakf'] = 1 / self.ncfile['waveTp'][self.wavedataindex]
+                elif 'peakf' in self.ncfile.variables.keys():
+                    wavespec['peakf'] = self.ncfile['waveTp'][self.wavedataindex]
+                else:
+                    pass
+    
+                    wavespec['units'] = {'Hs':self.ncfile['waveHs'].units,'peakf':'Hz','wavefreqbin':'Hz'}
 
                 # now do directionalWaveGaugeList gauge try
                 try:  # pull time specific data based on self.wavedataindex
@@ -381,14 +388,16 @@ class getObs:
                             wavespec['fspec'] = np.expand_dims(wavespec['fspec'], axis=0)
                             wavespec['units']['dWED'] = self.ncfile['directionalWaveEnergyDensity'].units
                             wavespec['units']['fspec'] = self.ncfile['waveEnergyDensity'].units
-
-                    wavespec['waveDp'] = self.ncfile['wavePeakDirectionPeakFrequency'][self.wavedataindex]
-                    wavespec['waveDm'] = self.ncfile['waveMeanDirection'][self.wavedataindex]
-                    wavespec['Tm'] = self.ncfile['waveTm'][self.wavedataindex]
-                    wavespec['units']['waveDp'] = self.ncfile['wavePeakDirectionPeakFrequency'].units
-                    wavespec['units']['waveDm'] = self.ncfile['waveMeanDirection'].units
-                    wavespec['units']['Tm'] = self.ncfile['waveTm'].units
-
+                    try:
+                        wavespec['waveDp'] = self.ncfile['wavePeakDirectionPeakFrequency'][self.wavedataindex]
+                        wavespec['waveDm'] = self.ncfile['waveMeanDirection'][self.wavedataindex]
+                        wavespec['Tm'] = self.ncfile['waveTm'][self.wavedataindex]
+                        wavespec['units']['waveDp'] = self.ncfile['wavePeakDirectionPeakFrequency'].units
+                        wavespec['units']['waveDm'] = self.ncfile['waveMeanDirection'].units
+                        wavespec['units']['Tm'] = self.ncfile['waveTm'].units
+                    except:
+                        pass
+                        
                     if returnAB is True:
                         wavespec['a1'] = self.ncfile['waveA1Value'][self.wavedataindex, :]
                         wavespec['a2'] = self.ncfile['waveA2Value'][self.wavedataindex, :]
