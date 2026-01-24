@@ -7,6 +7,7 @@
 """
 import collections
 import datetime as DT
+import logging
 import os
 import pickle as pickle
 import time
@@ -129,7 +130,7 @@ def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=60, cutrange=100000
     # ___________________ go now to open file   ___________________________________________
     finished, n, maxTries = False, 0, 3  # initializing variables to iterate over
     ncFile, allEpoch = None, None  # will return None's when URL doesn't exist
-    print(ncfileURL)
+    logging.debug(ncfileURL)
     indexRef = [0]
     while not finished and n < maxTries:
         try:
@@ -159,7 +160,7 @@ def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=60, cutrange=100000
             time.sleep(5)  # time in seconds to wait
             n += 1  # iteration number
     if indexRef[0] == 0:
-        return ncFile, sb.baseRound(allEpoch, base=dtRound)   #### Horrible fix, need updating
+        return ncFile, sb.baseRound(allEpoch, base=dtRound), None  #### Horrible fix, need updating
     else:
         return ncFile, sb.baseRound(allEpoch, base=dtRound), indexRef # round to nearest minute
 
@@ -242,8 +243,8 @@ class getObs:
         self.chlDataLoc = 'https://chlthredds.erdc.dren.mil/thredds/dodsC/frf/'  #
         self.server = kwargs.get('server', None)
         self._comp_time()
-        assert type(self.d2) == DT.datetime, 'd1 need to be in python "Datetime" data types'
-        assert type(self.d1) == DT.datetime, 'd2 need to be in python "Datetime" data types'
+        # assert type(self.d2) == DT.datetime, 'd1 need to be in python "Datetime" data types'
+        # assert type(self.d1) == DT.datetime, 'd2 need to be in python "Datetime" data types'
     
     def _comp_time(self):
         """Test if times are backwards."""
@@ -319,7 +320,7 @@ class getObs:
         # Making gauges flexible
         self._waveGaugeURLlookup(gaugenumber)
         # parsing out data of interest in time
-        self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
+        self.ncfile, self.allEpoch, _ = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=roundto * 60, epoch1=self.epochd1, epoch2=self.epochd2,
                                            start=self.d1, end=self.d2, server=self.server)
         try:
@@ -380,14 +381,14 @@ class getObs:
                     if spec is True:
                         wavespec['dWED'] = self.ncfile['directionalWaveEnergyDensity'][self.wavedataindex, :, :]
                         wavespec['fspec'] = self.ncfile['waveEnergyDensity'][self.wavedataindex, :]
-                        wavespec['units']['dWED'] = self.ncfile['directionalWaveEnergyDensity'].units
-                        wavespec['units']['fspec'] = self.ncfile['waveEnergyDensity'].units
+                        # wavespec['units']['dWED'] = self.ncfile['directionalWaveEnergyDensity'].units
+                        # wavespec['units']['fspec'] = self.ncfile['waveEnergyDensity'].units
 
                         if wavespec['dWED'].ndim < 3:
                             wavespec['dWED'] = np.expand_dims(wavespec['dWED'], axis=0)
                             wavespec['fspec'] = np.expand_dims(wavespec['fspec'], axis=0)
-                            wavespec['units']['dWED'] = self.ncfile['directionalWaveEnergyDensity'].units
-                            wavespec['units']['fspec'] = self.ncfile['waveEnergyDensity'].units
+                            # wavespec['units']['dWED'] = self.ncfile['directionalWaveEnergyDensity'].units
+                            # wavespec['units']['fspec'] = self.ncfile['waveEnergyDensity'].units
                     try:
                         wavespec['waveDp'] = self.ncfile['wavePeakDirectionPeakFrequency'][self.wavedataindex]
                         wavespec['waveDm'] = self.ncfile['waveMeanDirection'][self.wavedataindex]
@@ -550,7 +551,7 @@ class getObs:
         else:
             raise NameError('Check gauge name')
         
-        self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
+        self.ncfile, self.allEpoch, _= getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=roundto * 60)  # start=self.d1, end=self.d2) <
         # -- needs to be tested
         currdataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
@@ -773,7 +774,7 @@ class getObs:
         # this is the back end of the url for waterlevel
         self.dataloc = 'oceanography/waterlevel/eopNoaaTide/eopNoaaTide.ncml'
 
-        self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
+        self.ncfile, self.allEpoch, _ = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=collectionlength * 60, start=self.d1,
                                            end=self.d2)
         self.WLdataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
@@ -1150,7 +1151,7 @@ class getObs:
                
         """
         self.dataloc = 'survey/gridded/gridded.ncml'  # location of the gridded surveys
-        self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
+        self.ncfile, self.allEpoch, _ = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=1 * 60)
         try:
             self.bathydataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
@@ -2072,7 +2073,7 @@ class getObs:
         else:
             raise NotImplementedError('valid lidar locs are "dune" and "pier" and "claris"')
 
-        self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
+        self.ncfile, self.allEpoch, _ = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=1 * 60, server=self.server)
         self.idxDEM = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1, epochEnd=self.epochd2)
 
@@ -2723,7 +2724,7 @@ class getDataTestBed:
         #   go get the index and return based on method chosen             #
         ####################################################################
         # go ahead and assign the ncfile first....
-        self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
+        self.ncfile, self.allEpoch, _ = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=1 * 60, start=self.start, end=self.end)
         
         try:
