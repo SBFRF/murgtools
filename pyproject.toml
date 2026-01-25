@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "getdatatestbed"
+name = "murgtools"
 version = "0.9.0"
 description = "Utilities for retrieving data from the USACE Field Research Facility Coastal Model Test Bed (CMTB)"
 readme = "README.md"
@@ -61,13 +61,13 @@ test = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/SBFRF/getdatatestbed"
-Repository = "https://github.com/SBFRF/getdatatestbed"
-Documentation = "https://github.com/SBFRF/getdatatestbed#readme"
+Homepage = "https://github.com/SBFRF/murgtools"
+Repository = "https://github.com/SBFRF/murgtools"
+Documentation = "https://github.com/SBFRF/murgtools#readme"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["getdatatestbed*"]
+include = ["murgtools*"]
 exclude = ["tests*"]
 
 [tool.pytest.ini_options]
@@ -99,7 +99,7 @@ exclude = [
 convention = "google"
 
 [tool.coverage.run]
-source = ["getdatatestbed"]
+source = ["murgtools"]
 omit = ["tests/*"]
 
 [tool.coverage.report]

@@ -9,7 +9,7 @@ Tests cover single point and array conversions for all coordinate systems:
 import numpy as np
 import pytest
 
-from getdatatestbed.testbedutils import geoprocess as gp
+from murgtools.utils import geoprocess as gp
 
 
 # Reference test point from docstrings (south rail at 1860)

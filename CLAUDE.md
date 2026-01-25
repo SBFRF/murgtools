@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-getdatatestbed is a Python library for retrieving data from the USACE Field Research Facility (FRF) Coastal Model Test Bed (CMTB). It interfaces with CHL public THREDDS servers and local FRF servers to access coastal oceanographic and meteorological data stored in NetCDF format.
+murgtools is a Python library for retrieving data from the USACE Field Research Facility (FRF) Coastal Model Test Bed (CMTB). It interfaces with CHL public THREDDS servers and local FRF servers to access coastal oceanographic and meteorological data stored in NetCDF format.
 
 ## Build & Development Commands
 
@@ -35,17 +35,34 @@ pydocstyle --convention=google
 
 ## Architecture
 
+### Package Structure
+
+```
+murgtools/
+├── __init__.py          # Top-level exports
+├── getdata/             # Data retrieval subpackage
+│   ├── getDataFRF.py    # FRF observational and model data
+│   ├── getOutsideData.py # External data sources (NCEP, ECMWF)
+│   └── getPlotData.py   # Plotting utilities
+└── utils/               # Utility subpackage
+    ├── geoprocess.py    # Coordinate transformations
+    ├── sblib.py         # Base utility functions
+    ├── anglesLib.py     # Angle & polar coordinate conversions
+    ├── gridTools.py     # Grid manipulation
+    └── ...
+```
+
 ### Core Modules
 
-**getDataFRF.py** - Main data retrieval module containing:
+**murgtools/getdata/getDataFRF.py** - Main data retrieval module containing:
 - `getObs` class: Retrieves observational data (waves, wind, water levels, bathymetry, lidar, CTD, altimeters)
 - `getDataTestBed` class: Retrieves model output data (STWAVE, CMS, CSHORE)
 - Helper functions: `getnc()`, `gettime()`, `removeDuplicatesFromDictionary()`
 
-**getOutsideData.py** - External data sources:
+**murgtools/getdata/getOutsideData.py** - External data sources:
 - `forecastData` class: Retrieves forecast data from NCEP (WW3 spectral forecasts), ECMWF, and Argus cBathy
 
-**getPlotData.py** - Plotting utilities that wrap getObs for time-matched model vs observation comparisons
+**murgtools/getdata/getPlotData.py** - Plotting utilities that wrap getObs for time-matched model vs observation comparisons
 
 ### Data Access Pattern
 
@@ -64,7 +81,7 @@ Server selection is automatic based on network IP (FRF subnet uses local server)
 
 ### Key Dependencies
 
-- `testbedutils` - Required utility library (geoprocess, sblib, anglesLib, gridTools)
+- `murgtools.utils` - Utility library (geoprocess, sblib, anglesLib, gridTools)
 - `netCDF4` - NetCDF data access
 - `numpy`, `pandas` - Data manipulation
 

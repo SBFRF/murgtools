@@ -18,7 +18,7 @@ import netCDF4 as nc
 import numpy as np
 import pandas as pd
 
-from .testbedutils import geoprocess as gp, sblib as sb
+from murgtools.utils import geoprocess as gp, sblib as sb
 
 def gettime(allEpoch, epochStart, epochEnd, indexRef=0):
     """This function opens the netcdf file, and retrieves time.
