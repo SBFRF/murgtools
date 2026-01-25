@@ -20,7 +20,7 @@ def extract_time(data,index):
     vars = list(data.keys())
     new = {}
     for vv in vars:
-        if vv is 'xm' or vv is 'ym':
+        if vv == 'xm' or vv == 'ym':
             new[vv] = data[vv]
         else:
             new[vv] = data[vv][index]
@@ -256,9 +256,9 @@ def cBathy_VarianceLogic(cBathy, variancePacket, rawspec, varianceThreshold=0.13
                         xinds = np.where(np.in1d(cbathyold['xm'], cBathy['xm']))[0]
                         yinds = np.where(np.in1d(cbathyold['ym'], cBathy['ym']))[0]
                         for key in list(cbathyold.keys()):
-                            if key is 'xm':
+                            if key == 'xm':
                                 cbathyold[key] = cbathyold[key][xinds]
-                            elif key is 'ym':
+                            elif key == 'ym':
                                 cbathyold[key] = cbathyold[key][xinds]
                             elif key not in ['epochtime', 'time', 'xm', 'ym']:
                                 cbathyold[key] = cbathyold[key][
@@ -417,9 +417,9 @@ def cBathy_ThresholdedLogic(cBathy, rawspec, waveHsThreshold=1.2):
                         xinds = np.where(np.in1d(cbathyold['xm'], cBathy['xm']))[0]
                         yinds = np.where(np.in1d(cbathyold['ym'], cBathy['ym']))[0]
                         for key in list(cbathyold.keys()):
-                            if key is 'xm':
+                            if key == 'xm':
                                 cbathyold[key] = cbathyold[key][xinds]
-                            elif key is 'ym':
+                            elif key == 'ym':
                                 cbathyold[key] = cbathyold[key][xinds]
                             elif key not in ['epochtime', 'time', 'xm', 'ym']:
                                 cbathyold[key] = cbathyold[key][slice(yinds[0], yinds[-1]+1), slice(xinds[0], xinds[-1]+1)]
