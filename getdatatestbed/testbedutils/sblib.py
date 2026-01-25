@@ -333,11 +333,8 @@ def makegif(flist, ofname, size=None, dt=0.5):
     #     im.thumbnail(size, Image.ANTIALIAS)
     # images2gif.writeGif(ofname, images, duration=dt, nq=15)
     import imageio
-    from PIL import Image
     images = []
-    if size != None:
-        for im in images:
-            im.thumbnail(size, Image.ANTIALIAS)
+    # Note: size parameter is currently unused (thumbnail resize not implemented)
     for filename in flist:
         images.append(imageio.imread(filename))
     imageio.mimwrite(ofname, images, duration=dt)
