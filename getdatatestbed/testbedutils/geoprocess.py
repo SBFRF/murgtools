@@ -191,12 +191,15 @@ def ncsp2LatLon(spE, spN):
     # '1402291.0  5076289.5'
 
     EPSG = 3358  # taken from spatialreference.org/ref/epsg/3358
-    # NC stateplane NAD83
-    spNC = pyproj.Proj("epsg:{}".format(EPSG))
-    LL = pyproj.CRS(proj='latlon', datum='WGS84')#pyproj.Proj('epsg:{}'.format(epsgLL))  # epsg for NAD83 projection
-    lon, lat = pyproj.transform(spNC, LL, spE, spN)
+    # NC stateplane NAD83 to WGS84 (EPSG:4326)
+    transformer = pyproj.Transformer.from_crs(
+        f"epsg:{EPSG}",
+        "epsg:4326",
+        always_xy=True
+    )
+    lon, lat = transformer.transform(spE, spN)
 
-    return  {'lon': lon, 'lat': lat, 'StateplaneE': spE, 'StateplaneN': spN}
+    return {'lon': lon, 'lat': lat, 'StateplaneE': spE, 'StateplaneN': spN}
 
 def LatLon2ncsp(lon, lat):
     """This function uses pyproj to convert longitude and latitude to stateplane
@@ -230,14 +233,14 @@ def LatLon2ncsp(lon, lat):
 
     """
     EPSG = 3358  # taken from spatialreference.org/ref/epsg/3358
-    # NC stateplane NAD83
-    spNC = pyproj.Proj(init="epsg:{}".format(EPSG))
-    spE, spN = spNC(lon,lat)
+    # WGS84 (EPSG:4326) to NC stateplane NAD83
+    transformer = pyproj.Transformer.from_crs(
+        "epsg:4326",
+        f"epsg:{EPSG}",
+        always_xy=True
+    )
+    spE, spN = transformer.transform(lon, lat)
 
-    # epsgLL =  4269 # 4326
-    # LL = pyproj.Proj('epsg:{}'.format(epsgLL))  # epsg for NAD83 projection
-    # replaced below transform with direct conversion above
-    # spE, spN = pyproj.transform(LL, spNC, lon, lat)
     ans = {'lon': lon, 'lat': lat, 'StateplaneE': spE, 'StateplaneN': spN}
     return ans
 
@@ -391,6 +394,7 @@ def utm2LatLon(utmE, utmN, zn, zl):
         lon:  coordinates of the utm input points
 
     """
+    import utm
 
     # check to see if points are...
     assert np.size(utmE) == np.size(utmN), 'utm2LatLon error: UTM point vectors must be equal lengths'
@@ -405,16 +409,17 @@ def utm2LatLon(utmE, utmN, zn, zl):
 
     df = pd.DataFrame(index=list(range(0, np.size(utmE))), columns=columns)
 
-    if np.size(utmE) > len(utmE):
-        utmE = utmE[0]
-        utmN = utmN[0]
+    # Handle 2D arrays by flattening
+    if np.ndim(utmE) > 1:
+        utmE = np.asarray(utmE).flatten()
+        utmN = np.asarray(utmN).flatten()
 
     df['utmE'] = utmE
     df['utmN'] = utmN
     df['zn'] = zn
     df['zl'] = zl
 
-    df['ll'] = df.apply(lambda x: utm.to_latlon(x.utmE, x.utmN, x.zn, x.zl), axis=1)
+    df['ll'] = df.apply(lambda x: utm.to_latlon(x.utmE, x.utmN, int(x.zn), x.zl), axis=1)
 
     L1, L2 = list(zip(*np.asarray(df['ll'])))
 
