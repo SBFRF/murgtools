@@ -1,15 +1,15 @@
-"""Setup tools for getDataTestBed."""
+"""Setup tools for murgtools."""
 from setuptools import setup, find_packages
 
 setup(
-    name='getdatatestbed',
+    name='murgtools',
     version='0.9.0',
     description='Utilities for retrieving data from the USACE Field Research Facility Coastal Model Test Bed (CMTB)',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     author='Spicer Bak',
     author_email='spicer.bak@usace.army.mil',
-    url='https://github.com/SBFRF/getdatatestbed',
+    url='https://github.com/SBFRF/murgtools',
     packages=find_packages(exclude=['tests', 'tests.*']),
     python_requires='>=3.9',
     install_requires=[

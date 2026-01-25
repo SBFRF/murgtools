@@ -12,9 +12,9 @@ class TestForecastDataClass:
         """Test forecastData initialization with valid datetime."""
         d1 = DT.datetime(2020, 1, 1, 0, 0, 0)
 
-        with patch('getdatatestbed.getOutsideData.nc') as mock_nc:
+        with patch('murgtools.getdata.getOutsideData.nc') as mock_nc:
             mock_nc.date2num = MagicMock(return_value=1577836800.0)
-            from getdatatestbed.getOutsideData import forecastData
+            from murgtools.getdata.getOutsideData import forecastData
 
             fd = forecastData(d1)
 
@@ -24,9 +24,9 @@ class TestForecastDataClass:
 
     def test_forecastdata_raises_on_non_datetime(self):
         """Test that forecastData raises on non-datetime input."""
-        with patch('getdatatestbed.getOutsideData.nc') as mock_nc:
+        with patch('murgtools.getdata.getOutsideData.nc') as mock_nc:
             mock_nc.date2num = MagicMock(return_value=1577836800.0)
-            from getdatatestbed.getOutsideData import forecastData
+            from murgtools.getdata.getOutsideData import forecastData
 
             with pytest.raises(AssertionError):
                 forecastData("2020-01-01")
@@ -35,9 +35,9 @@ class TestForecastDataClass:
         """Test that forecastData has all required data location attributes."""
         d1 = DT.datetime(2020, 1, 1, 0, 0, 0)
 
-        with patch('getdatatestbed.getOutsideData.nc') as mock_nc:
+        with patch('murgtools.getdata.getOutsideData.nc') as mock_nc:
             mock_nc.date2num = MagicMock(return_value=1577836800.0)
-            from getdatatestbed.getOutsideData import forecastData
+            from murgtools.getdata.getOutsideData import forecastData
 
             fd = forecastData(d1)
 
@@ -51,9 +51,9 @@ class TestForecastDataClass:
         """Test that forecastData has correct server URLs."""
         d1 = DT.datetime(2020, 1, 1, 0, 0, 0)
 
-        with patch('getdatatestbed.getOutsideData.nc') as mock_nc:
+        with patch('murgtools.getdata.getOutsideData.nc') as mock_nc:
             mock_nc.date2num = MagicMock(return_value=1577836800.0)
-            from getdatatestbed.getOutsideData import forecastData
+            from murgtools.getdata.getOutsideData import forecastData
 
             fd = forecastData(d1)
 
@@ -69,9 +69,9 @@ class TestGetWW3Method:
         """Test that getWW3 requires string type for forecastHour."""
         d1 = DT.datetime(2020, 1, 1, 0, 0, 0)
 
-        with patch('getdatatestbed.getOutsideData.nc') as mock_nc:
+        with patch('murgtools.getdata.getOutsideData.nc') as mock_nc:
             mock_nc.date2num = MagicMock(return_value=1577836800.0)
-            from getdatatestbed.getOutsideData import forecastData
+            from murgtools.getdata.getOutsideData import forecastData
 
             fd = forecastData(d1)
 
@@ -82,9 +82,9 @@ class TestGetWW3Method:
         """Test that getWW3 constructs URLs with expected format."""
         d1 = DT.datetime(2020, 1, 15, 0, 0, 0)
 
-        with patch('getdatatestbed.getOutsideData.nc') as mock_nc:
+        with patch('murgtools.getdata.getOutsideData.nc') as mock_nc:
             mock_nc.date2num = MagicMock(return_value=1577836800.0)
-            from getdatatestbed.getOutsideData import forecastData
+            from murgtools.getdata.getOutsideData import forecastData
 
             fd = forecastData(d1)
 
@@ -104,9 +104,9 @@ class TestGetCbathyFromFTP:
         """Test that single datetime is converted to list."""
         d1 = DT.datetime(2020, 1, 1, 0, 0, 0)
 
-        with patch('getdatatestbed.getOutsideData.nc') as mock_nc:
+        with patch('murgtools.getdata.getOutsideData.nc') as mock_nc:
             mock_nc.date2num = MagicMock(return_value=1577836800.0)
-            from getdatatestbed.getOutsideData import forecastData
+            from murgtools.getdata.getOutsideData import forecastData
 
             fd = forecastData(d1)
 
@@ -125,9 +125,9 @@ class TestGetCbathyFromFTP:
         """Test that non-datetime input raises assertion."""
         d1 = DT.datetime(2020, 1, 1, 0, 0, 0)
 
-        with patch('getdatatestbed.getOutsideData.nc') as mock_nc:
+        with patch('murgtools.getdata.getOutsideData.nc') as mock_nc:
             mock_nc.date2num = MagicMock(return_value=1577836800.0)
-            from getdatatestbed.getOutsideData import forecastData
+            from murgtools.getdata.getOutsideData import forecastData
 
             fd = forecastData(d1)
 

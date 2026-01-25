@@ -4,7 +4,7 @@ include requirements.txt
 include requirements-test.txt
 include pyproject.toml
 
-recursive-include getdatatestbed *.py
+recursive-include murgtools *.py
 
 prune tests
 prune .github

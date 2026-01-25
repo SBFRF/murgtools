@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 
-from getdatatestbed.getDataFRF import gettime, removeDuplicatesFromDictionary
+from murgtools.getdata.getDataFRF import gettime, removeDuplicatesFromDictionary
 
 
 class TestGettime:
@@ -110,38 +110,38 @@ class TestRemoveDuplicatesFromDictionary:
 class TestGetObsClass:
     """Tests for the getObs class initialization."""
 
-    @patch('getdatatestbed.getDataFRF.nc.date2num')
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
     def test_getobs_initializes_with_valid_dates(self, mock_date2num, sample_datetime_range):
         """Test that getObs initializes correctly with valid datetime range."""
         mock_date2num.return_value = 1577836800.0
         d1, d2 = sample_datetime_range
 
-        from getdatatestbed.getDataFRF import getObs
+        from murgtools.getdata.getDataFRF import getObs
         obs = getObs(d1, d2)
 
         assert obs.d1 == d1
         assert obs.d2 == d2
         assert obs.callingClass == 'getObs'
 
-    @patch('getdatatestbed.getDataFRF.nc.date2num')
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
     def test_getobs_has_wave_gauge_list(self, mock_date2num, sample_datetime_range):
         """Test that getObs has predefined wave gauge list."""
         mock_date2num.return_value = 1577836800.0
         d1, d2 = sample_datetime_range
 
-        from getdatatestbed.getDataFRF import getObs
+        from murgtools.getdata.getDataFRF import getObs
         obs = getObs(d1, d2)
 
         assert hasattr(obs, 'waveGaugeList')
         assert 'waverider-26m' in obs.waveGaugeList
 
-    @patch('getdatatestbed.getDataFRF.nc.date2num')
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
     def test_getobs_has_thredds_locations(self, mock_date2num, sample_datetime_range):
         """Test that getObs has THREDDS server locations configured."""
         mock_date2num.return_value = 1577836800.0
         d1, d2 = sample_datetime_range
 
-        from getdatatestbed.getDataFRF import getObs
+        from murgtools.getdata.getDataFRF import getObs
         obs = getObs(d1, d2)
 
         assert hasattr(obs, 'FRFdataloc')
@@ -151,26 +151,26 @@ class TestGetObsClass:
 class TestGetDataTestBedClass:
     """Tests for the getDataTestBed class initialization."""
 
-    @patch('getdatatestbed.getDataFRF.nc.date2num')
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
     def test_getdatatestbed_initializes_correctly(self, mock_date2num, sample_datetime_range):
         """Test that getDataTestBed initializes with correct attributes."""
         mock_date2num.return_value = 1577836800.0
         d1, d2 = sample_datetime_range
 
-        from getdatatestbed.getDataFRF import getDataTestBed
+        from murgtools.getdata.getDataFRF import getDataTestBed
         tb = getDataTestBed(d1, d2)
 
         assert tb.start == d1
         assert tb.end == d2
         assert tb.callingClass == 'getDataTestBed'
 
-    @patch('getdatatestbed.getDataFRF.nc.date2num')
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
     def test_getdatatestbed_has_data_locations(self, mock_date2num, sample_datetime_range):
         """Test that getDataTestBed has data location attributes."""
         mock_date2num.return_value = 1577836800.0
         d1, d2 = sample_datetime_range
 
-        from getdatatestbed.getDataFRF import getDataTestBed
+        from murgtools.getdata.getDataFRF import getDataTestBed
         tb = getDataTestBed(d1, d2)
 
         assert hasattr(tb, 'FRFdataloc')

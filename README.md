@@ -1,30 +1,30 @@
-# getdatatestbed
+# murgtools
 
 A Python library for retrieving data from the USACE Field Research Facility (FRF) Coastal Model Test Bed (CMTB).
 
 ## Overview
 
-`getdatatestbed` provides utilities for accessing observational and model data from the CHL public THREDDS server and local FRF server. It interfaces with NetCDF data files containing coastal oceanographic and meteorological measurements.
+`murgtools` provides utilities for accessing observational and model data from the CHL public THREDDS server and local FRF server. It interfaces with NetCDF data files containing coastal oceanographic and meteorological measurements.
 
 ## Installation
 
 ### From PyPI (when available)
 
 ```bash
-pip install getdatatestbed
+pip install murgtools
 ```
 
 ### From GitHub
 
 ```bash
-pip install git+https://github.com/SBFRF/getdatatestbed.git
+pip install git+https://github.com/SBFRF/murgtools.git
 ```
 
 ### Development Installation
 
 ```bash
-git clone https://github.com/SBFRF/getdatatestbed.git
-cd getdatatestbed
+git clone https://github.com/SBFRF/murgtools.git
+cd murgtools
 pip install -e ".[dev]"
 ```
 
@@ -32,7 +32,7 @@ pip install -e ".[dev]"
 
 ```python
 from datetime import datetime
-from getdatatestbed import getObs
+from murgtools.getdata import getObs
 
 # Define time range
 start = datetime(2020, 1, 1)
@@ -49,6 +49,20 @@ wind_data = obs.getWind()
 
 # Retrieve water level data
 wl_data = obs.getWL()
+```
+
+## Package Structure
+
+```
+murgtools/
+├── getdata/             # Data retrieval subpackage
+│   ├── getDataFRF.py    # FRF observational and model data
+│   ├── getOutsideData.py # External data sources
+│   └── getPlotData.py   # Plotting utilities
+└── utils/               # Utility subpackage
+    ├── geoprocess.py    # Coordinate transformations
+    ├── sblib.py         # Base utility functions
+    └── ...
 ```
 
 ## Main Classes
@@ -99,7 +113,7 @@ pip install -e ".[test]"
 pytest tests/ -v -m "not slow"
 
 # Run with coverage
-pytest tests/ -v --cov=getdatatestbed --cov-report=term-missing
+pytest tests/ -v --cov=murgtools --cov-report=term-missing
 ```
 
 ## License
