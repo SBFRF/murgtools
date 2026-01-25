@@ -34,7 +34,7 @@ def oMagnitude(x):
         oMagnitude(.002)
             -3
     """
-    if x is not 0:
+    if x != 0:
         return int(math.floor(math.log10(x)))
     else:
         return 0
@@ -334,9 +334,7 @@ def makegif(flist, ofname, size=None, dt=0.5):
     # images2gif.writeGif(ofname, images, duration=dt, nq=15)
     import imageio
     images = []
-    if size != None:
-        for im in images:
-            im.thumbnail(size, Image.ANTIALIAS)
+    # Note: size parameter is currently unused (thumbnail resize not implemented)
     for filename in flist:
         images.append(imageio.imread(filename))
     imageio.mimwrite(ofname, images, duration=dt)
@@ -724,13 +722,13 @@ def date_range(start, end, intv=None):
     date_list = [start]
     cnt = 1
     while date_list[-1] < end:
-        if intv is 'day':
+        if intv == 'day':
             date_list.append(start + DT.datetime.timedelta(days=1 * cnt))
-        elif intv is 'week':
+        elif intv == 'week':
             date_list.append(start + DT.datetime.timedelta(days=7 * cnt))
-        elif intv is 'month':
+        elif intv == 'month':
             date_list.append(start + relativedelta(months=+1 * cnt))
-        elif intv is 'year':
+        elif intv == 'year':
             date_list.append(start + relativedelta(years=+1 * cnt))
 
         cnt = cnt + 1

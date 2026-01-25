@@ -21,6 +21,7 @@ setup(
         'matplotlib>=3.0.0',
         'scipy>=1.6.0',
         'python-dateutil>=2.8.0',
+        'utm>=0.7.0',
     ],
     extras_require={
         'dev': [

@@ -370,12 +370,15 @@ def makeTimeMeanBackgroundBathy(dir_loc, dSTR_s=None, dSTR_e=None, scalecDict=No
         gridDict['xFRFi_vec'] = xFRFi_vec
         gridDict['yFRFi_vec'] = yFRFi_vec
 
-        temp = mbD.subgridBounds2(surveyDict, gridDict, maxSpace=249)
-        x0 = temp['x0']
-        x1 = temp['x1']
-        y0 = temp['y0']
-        y1 = temp['y1']
-        del temp
+        # TODO: mbD (MakeUpdatedBathyDEM) module not available - see line 232
+        # temp = mbD.subgridBounds2(surveyDict, gridDict, maxSpace=249)
+        # x0 = temp['x0']
+        # x1 = temp['x1']
+        # y0 = temp['y0']
+        # y1 = temp['y1']
+        # del temp
+        raise NotImplementedError("mbD.subgridBounds2 requires MakeUpdatedBathyDEM module which is not available")
+        x0 = x1 = y0 = y1 = None  # Placeholders - code unreachable after raise above
 
         # if you wound up throwing out this survey!!!
         if x0 is None:
@@ -542,7 +545,10 @@ def makeTimeMeanBackgroundBathy(dir_loc, dSTR_s=None, dSTR_e=None, scalecDict=No
 
         # spline time?
         wb = 1 - np.divide(MSEn, targetvar + MSEn)
-        newZdiff = bspline_pertgrid(Zdiff, wb, splinebctype=splinebctype, lc=lc, dxm=dxm, dxi=dxi)
+        # TODO: bspline_pertgrid function not available - see line 234
+        # newZdiff = bspline_pertgrid(Zdiff, wb, splinebctype=splinebctype, lc=lc, dxm=dxm, dxi=dxi)
+        raise NotImplementedError("bspline_pertgrid requires bsplineFunctions module which is not available")
+        newZdiff = None  # Placeholder - code unreachable after raise above
         newZ = Zi + newZdiff
 
         del Z
