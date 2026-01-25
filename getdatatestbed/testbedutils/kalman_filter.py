@@ -193,14 +193,14 @@ def cBathy_VarianceLogic(cBathy, variancePacket, rawspec, varianceThreshold=0.13
     # first ensure that the wave data and cbathy have same time step,
     # first remove cbathy's produced
     # if they don't interpolate the wavedata to the cbathy time stamp
-    if ~np.in1d(rawspec['time'], cBathy['time']).all():
+    if ~np.isin(rawspec['time'], cBathy['time']).all():
         # interpolate the rawspec to the cbathy time frame
         rawspec['Hs'] = np.interp(cBathy['epochtime'], xp=rawspec['epochtime'], fp=rawspec['Hs'])
         rawspec['epochtime'] = cBathy['epochtime']
-    if ~np.in1d(variancePacket['time'], cBathy['time']).all():
-        idxVar = np.argwhere(np.in1d(variancePacket['time'], cBathy['time']))
+    if ~np.isin(variancePacket['time'], cBathy['time']).all():
+        idxVar = np.argwhere(np.isin(variancePacket['time'], cBathy['time']))
         variancePacket = sb.reduceDict(variancePacket, idxVar.squeeze()) # make sure variance matches cBathy
-        idxCB = np.argwhere(np.in1d(cBathy['time'], variancePacket['time']))
+        idxCB = np.argwhere(np.isin(cBathy['time'], variancePacket['time']))
         cBathy = sb.reduceDict(cBathy, idxCB.squeeze()) # make sure cBathy matches variance
     assert (cBathy['time'] == variancePacket['time']).all(), 'time check'
 
@@ -253,8 +253,8 @@ def cBathy_VarianceLogic(cBathy, variancePacket, rawspec, varianceThreshold=0.13
                         go = getDataFRF.getObs(cBathy['time'][0], cBathy['time'][-1])
                         full = go.getBathyGridcBathy()
                         cbathyold = sb.reduceDict(full, -1)
-                        xinds = np.where(np.in1d(cbathyold['xm'], cBathy['xm']))[0]
-                        yinds = np.where(np.in1d(cbathyold['ym'], cBathy['ym']))[0]
+                        xinds = np.where(np.isin(cbathyold['xm'], cBathy['xm']))[0]
+                        yinds = np.where(np.isin(cbathyold['ym'], cBathy['ym']))[0]
                         for key in list(cbathyold.keys()):
                             if key == 'xm':
                                 cbathyold[key] = cbathyold[key][xinds]
@@ -362,7 +362,7 @@ def cBathy_ThresholdedLogic(cBathy, rawspec, waveHsThreshold=1.2):
     ##### begin Running logic
     # first ensure that the wave data and cbathy have same time step,
     # if they don't interpolate the wavdata to the cbathy time stamp
-    if ~np.in1d(rawspec['time'], cBathy['time']).all():
+    if ~np.isin(rawspec['time'], cBathy['time']).all():
         # interpolate the rawspec to the cbathy time frame
         rawspec['Hs'] = np.interp(cBathy['epochtime'], xp=rawspec['epochtime'], fp=rawspec['Hs'])
         rawspec['epochtime'] = cBathy['epochtime']
@@ -414,8 +414,8 @@ def cBathy_ThresholdedLogic(cBathy, rawspec, waveHsThreshold=1.2):
                         go = getDataFRF.getObs(cBathy['time'][0], cBathy['time'][-1])
                         full = go.getBathyGridcBathy()
                         cbathyold = sb.reduceDict(full, -1)
-                        xinds = np.where(np.in1d(cbathyold['xm'], cBathy['xm']))[0]
-                        yinds = np.where(np.in1d(cbathyold['ym'], cBathy['ym']))[0]
+                        xinds = np.where(np.isin(cbathyold['xm'], cBathy['xm']))[0]
+                        yinds = np.where(np.isin(cbathyold['ym'], cBathy['ym']))[0]
                         for key in list(cbathyold.keys()):
                             if key == 'xm':
                                 cbathyold[key] = cbathyold[key][xinds]

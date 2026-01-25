@@ -105,7 +105,7 @@ def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=60, cutrange=100000
 
     elif isinstance(start, DT.datetime) and isinstance(end, DT.datetime) \
         and (start.year == end.year and start.month == end.month) \
-        and ~np.in1d(doNotDrillList, dataLoc.split('/')).any():
+        and ~np.isin(doNotDrillList, dataLoc.split('/')).any():
         # this section dives to the specific month's datafile if it's within the same month
         dataLocSplit = os.path.split(dataLoc)
         fileparts = dataLocSplit[0].split('/')
@@ -201,17 +201,17 @@ def removeDuplicatesFromDictionary(inputDict):
             inputDict = sb.reduceDict(inputDict, idxUnique)
             # try:  # python 3.6 + only
             #    ans2 = list(dict.fromkeys(inputDict[key]))
-            #    # nonzero(np.in1d(inputDict[key], ans2)) #<===================================
+            #    # nonzero(np.isin(inputDict[key], ans2)) #<===================================
             #    this leaves duplicates
             # except: # a slower way
             #    seen = set()
             #    ans3b = [x for x in inputDict[key] if x not in seen and not seen.add(x)]
-            #    idxObs = np.nonzero(np.in1d(inputDict[key], ans3b))
+            #    idxObs = np.nonzero(np.isin(inputDict[key], ans3b))
             # original Way  --- super slow
             # dupes = np.array([x for n, x in enumerate(inputDict[key]) if x in inputDict[key][
             # :n]]).squeeze()
             # idxObs = np.delete(np.arange(len(inputDict[key])),
-            #                    np.argwhere(np.in1d(inputDict[key], dupes).squeeze())[
+            #                    np.argwhere(np.isin(inputDict[key], dupes).squeeze())[
             #                    ::2].squeeze())  # delete
             #                    every other duplicate record
             # inputDict = sb.reduceDict(inputDict, idxObs)
@@ -1005,7 +1005,7 @@ class getObs:
                                                                               'in database'  # if
             # all of the profile
             # numbers match
-            idx2mask = np.in1d(self.ncfile['profileNumber'][idx],
+            idx2mask = np.isin(self.ncfile['profileNumber'][idx],
                                profilenumbers)  # boolean true/false of time and profile number
             idx = idx[idx2mask]
 
