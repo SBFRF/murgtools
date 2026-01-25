@@ -229,3 +229,284 @@ class forecastData:
         #    import urllib
         #    urllib.urlretrieve(fn4)
         return oflist
+
+
+def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
+                        date=None, max_cloud_cover=20, pad=0.01,
+                        endpoint='element84'):
+    """Retrieve satellite imagery from STAC catalog for any location on Earth.
+
+    Fetches the nearest-in-time, cloud-filtered satellite imagery for a given
+    area of interest. Supports rotated/skewed quadrilateral AOIs and returns
+    georeferenced data suitable for overlay plotting.
+
+    Args:
+        corners: Four corner coordinates as [(lat, lon), (lat, lon), (lat, lon), (lat, lon)].
+            Defines a quadrilateral AOI (can be rotated/skewed).
+            Order: [top-left, top-right, bottom-left, bottom-right] or any consistent order.
+        filename: Optional path to save image as GeoTIFF (default None).
+        collection: STAC collection name. Options vary by endpoint:
+            Element84 (default):
+                - 'sentinel-2-l2a' (10m resolution, default)
+                - 'landsat-c2-l2' (30m resolution)
+            Planetary Computer:
+                - 'naip' (1m resolution, US only)
+                - 'sentinel-2-l2a' (10m resolution)
+                - 'landsat-c2-l2' (30m resolution)
+        date: datetime object for target date (default: most recent available).
+        max_cloud_cover: Maximum cloud cover percentage to accept (default: 20).
+            Note: NAIP doesn't have cloud cover metadata, so this is ignored for NAIP.
+        pad: Bbox padding in degrees for conservative coverage (default: 0.01).
+        endpoint: STAC endpoint to use. Options:
+            - 'element84' (default): Element84 Earth Search
+            - 'planetary-computer': Microsoft Planetary Computer (has NAIP 1m imagery)
+
+    Returns:
+        dict: Dictionary containing:
+            - 'image': numpy.ndarray (H, W, 3) uint8 RGB, rotated to match AOI orientation
+            - 'time': datetime object of scene acquisition
+            - 'epochtime': float, seconds since 1970-01-01
+            - 'bbox': [min_lon, min_lat, max_lon, max_lat], original query bbox
+            - 'extent': [left, right, bottom, top], for matplotlib imshow extent param
+            - 'corners_geo': [(lat, lon), ...], 4 corners of output image in geo coords
+            - 'pixel_to_geo': function(px, py) -> (lat, lon), coordinate transform
+            - 'geo_to_pixel': function(lat, lon) -> (px, py), inverse transform
+            - 'resolution_m': float, approximate meters per pixel
+            - 'rotation_angle': float, degrees of rotation applied
+            - 'cloud_cover': float, cloud cover percentage of scene
+            - 'collection': str, STAC collection used
+            - 'scene_id': str, unique scene identifier
+        Returns None if no imagery found matching criteria.
+
+    Example:
+        >>> import datetime as DT
+        >>> corners = [
+        ...     (36.1860983, -75.7529892),  # top-left
+        ...     (36.1878844, -75.7464819),  # top-right
+        ...     (36.1779848, -75.7496048),  # bottom-left
+        ...     (36.1792073, -75.7421465)   # bottom-right
+        ... ]
+        >>> result = getSatelliteImagery(corners, date=DT.datetime(2024, 6, 15))
+        >>> if result:
+        ...     plt.imshow(result['image'], extent=result['extent'])
+        ...     # Overlay a point
+        ...     px, py = result['geo_to_pixel'](36.183, -75.749)
+        ...     plt.plot(-75.749, 36.183, 'ro')
+
+    """
+    import requests
+    import tifffile
+    import tempfile
+    from scipy.ndimage import rotate as scipy_rotate
+
+    # 1. Parse corners - accept (lat, lon) format
+    lons = [c[1] for c in corners]
+    lats = [c[0] for c in corners]
+    bbox = [min(lons) - pad, min(lats) - pad,
+            max(lons) + pad, max(lats) + pad]
+
+    # 2. Compute rotation angle from AOI orientation
+    # corners[0] to corners[1] defines the "top edge" direction
+    dx = corners[1][1] - corners[0][1]  # lon difference
+    dy = corners[1][0] - corners[0][0]  # lat difference
+    rotation_angle = np.degrees(np.arctan2(dy, dx))
+
+    # 3. Build STAC search query based on endpoint
+    endpoints = {
+        'element84': 'https://earth-search.aws.element84.com/v1/search',
+        'planetary-computer': 'https://planetarycomputer.microsoft.com/api/stac/v1/search'
+    }
+
+    if endpoint not in endpoints:
+        raise ValueError(f"Unknown endpoint '{endpoint}'. Options: {list(endpoints.keys())}")
+
+    stac_url = endpoints[endpoint]
+
+    if date is None:
+        date = DT.datetime.now()
+
+    # Search window: target date - 30 days to target date
+    # NAIP is released yearly, so use larger window
+    if collection == 'naip':
+        date_start = (date - DT.timedelta(days=365)).strftime('%Y-%m-%dT00:00:00Z')
+    else:
+        date_start = (date - DT.timedelta(days=30)).strftime('%Y-%m-%dT00:00:00Z')
+    date_end = date.strftime('%Y-%m-%dT23:59:59Z')
+
+    query = {
+        "collections": [collection],
+        "bbox": bbox,
+        "datetime": f"{date_start}/{date_end}",
+        "limit": 20
+    }
+
+    # 4. Execute STAC search
+    response = requests.post(stac_url, json=query)
+    response.raise_for_status()
+    results = response.json()
+
+    if not results.get('features'):
+        return None
+
+    # Filter by cloud cover (skip for NAIP which doesn't have cloud metadata)
+    if collection == 'naip':
+        features = results['features']
+    else:
+        features = [f for f in results['features']
+                    if f['properties'].get('eo:cloud_cover', 100) < max_cloud_cover]
+
+    if not features:
+        return None
+
+    # Sort by datetime descending (most recent first)
+    features.sort(key=lambda x: x['properties']['datetime'], reverse=True)
+    item = features[0]
+
+    # 5. Get visual/RGB composite asset URL (varies by collection)
+    if collection == 'naip':
+        # NAIP has 'image' asset with RGBIR bands
+        if 'image' in item['assets']:
+            rgb_url = item['assets']['image']['href']
+        else:
+            raise ValueError(f"No image asset found for NAIP {item['id']}")
+    elif 'visual' in item['assets']:
+        rgb_url = item['assets']['visual']['href']
+    elif 'tci' in item['assets']:
+        rgb_url = item['assets']['tci']['href']
+    else:
+        raise ValueError(f"No visual/RGB asset found for {item['id']}")
+
+    # Sign URL if using Planetary Computer (required for asset access)
+    if endpoint == 'planetary-computer':
+        sign_url = f"https://planetarycomputer.microsoft.com/api/sas/v1/sign?href={rgb_url}"
+        sign_resp = requests.get(sign_url)
+        sign_resp.raise_for_status()
+        rgb_url = sign_resp.json()['href']
+
+    # 6. Download COG and read with tifffile
+    with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+        tmp_path = tmp.name
+        resp = requests.get(rgb_url, stream=True)
+        resp.raise_for_status()
+        for chunk in resp.iter_content(chunk_size=8192):
+            tmp.write(chunk)
+
+    try:
+        image = tifffile.imread(tmp_path)
+    finally:
+        os.unlink(tmp_path)
+
+    # Handle NAIP's RGBIR format (4 bands) - extract RGB only
+    if collection == 'naip' and image.ndim == 3 and image.shape[-1] == 4:
+        image = image[:, :, :3]  # Keep only RGB, drop NIR
+
+    # 7. Crop to bbox
+    scene_bbox = item['bbox']  # [west, south, east, north]
+
+    h, w = image.shape[:2]
+    px_per_deg_x = w / (scene_bbox[2] - scene_bbox[0])
+    px_per_deg_y = h / (scene_bbox[3] - scene_bbox[1])
+
+    x1 = int((bbox[0] - scene_bbox[0]) * px_per_deg_x)
+    x2 = int((bbox[2] - scene_bbox[0]) * px_per_deg_x)
+    y1 = int((scene_bbox[3] - bbox[3]) * px_per_deg_y)
+    y2 = int((scene_bbox[3] - bbox[1]) * px_per_deg_y)
+
+    x1, x2 = max(0, x1), min(w, x2)
+    y1, y2 = max(0, y1), min(h, y2)
+
+    image = image[y1:y2, x1:x2]
+
+    # 8. Ensure uint8 RGB format
+    if image.dtype != np.uint8:
+        image = np.clip(image / image.max() * 255, 0, 255).astype(np.uint8)
+
+    # 9. Compute georeferencing before rotation
+    deg_per_px_x = (bbox[2] - bbox[0]) / image.shape[1]
+    deg_per_px_y = (bbox[3] - bbox[1]) / image.shape[0]
+
+    meters_per_deg = 111320 * np.cos(np.radians(np.mean(lats)))
+    resolution_m = deg_per_px_x * meters_per_deg
+
+    # 10. Rotate image to match AOI orientation
+    if abs(rotation_angle) > 0.1:
+        image = scipy_rotate(image, -rotation_angle, reshape=True, order=1,
+                            mode='constant', cval=0)
+    post_rot_shape = image.shape[:2]
+
+    # 11. Compute georeferencing for rotated image
+    center_lon = (bbox[0] + bbox[2]) / 2
+    center_lat = (bbox[1] + bbox[3]) / 2
+
+    rot_rad = np.radians(rotation_angle)
+    cos_r, sin_r = np.cos(rot_rad), np.sin(rot_rad)
+
+    half_w_deg = (post_rot_shape[1] / 2) * deg_per_px_x
+    half_h_deg = (post_rot_shape[0] / 2) * deg_per_px_y
+
+    extent = [center_lon - half_w_deg, center_lon + half_w_deg,
+              center_lat - half_h_deg, center_lat + half_h_deg]
+
+    h_out, w_out = post_rot_shape
+    corners_geo = [
+        (center_lat + half_h_deg, center_lon - half_w_deg),
+        (center_lat + half_h_deg, center_lon + half_w_deg),
+        (center_lat - half_h_deg, center_lon - half_w_deg),
+        (center_lat - half_h_deg, center_lon + half_w_deg),
+    ]
+
+    # Coordinate transform functions
+    def geo_to_pixel(lat, lon):
+        """Convert geographic coords to pixel coords in rotated image."""
+        dx = lon - center_lon
+        dy = lat - center_lat
+        dx_rot = dx * cos_r + dy * sin_r
+        dy_rot = -dx * sin_r + dy * cos_r
+        px = int(w_out / 2 + dx_rot / deg_per_px_x)
+        py = int(h_out / 2 - dy_rot / deg_per_px_y)
+        return (px, py)
+
+    def pixel_to_geo(px, py):
+        """Convert pixel coords in rotated image to geographic coords."""
+        dx_px = px - w_out / 2
+        dy_px = h_out / 2 - py
+        dx_deg = dx_px * deg_per_px_x
+        dy_deg = dy_px * deg_per_px_y
+        dx = dx_deg * cos_r - dy_deg * sin_r
+        dy = dx_deg * sin_r + dy_deg * cos_r
+        return (center_lat + dy, center_lon + dx)
+
+    # 12. Save as GeoTIFF if filename provided
+    if filename is not None:
+        tiepoint = (0, 0, 0, extent[0], extent[3], 0)
+        pixel_scale = (deg_per_px_x, deg_per_px_y, 0)
+        geotiff_geokeys = (1, 1, 0, 3,
+                          1024, 0, 1, 2,
+                          1025, 0, 1, 1,
+                          2048, 0, 1, 4326)
+
+        tifffile.imwrite(filename, image, photometric='rgb',
+                        extratags=[(33550, 'd', 3, pixel_scale),
+                                   (33922, 'd', 6, tiepoint),
+                                   (34735, 'H', 16, geotiff_geokeys)])
+
+    # 13. Build return dict
+    scene_time = DT.datetime.fromisoformat(
+        item['properties']['datetime'].replace('Z', '+00:00')
+    ).replace(tzinfo=None)
+
+    return {
+        'image': image,
+        'time': scene_time,
+        'epochtime': nc.date2num(scene_time, 'seconds since 1970-01-01 00:00:00'),
+        'bbox': bbox,
+        'extent': extent,
+        'corners_geo': corners_geo,
+        'pixel_to_geo': pixel_to_geo,
+        'geo_to_pixel': geo_to_pixel,
+        'resolution_m': resolution_m,
+        'rotation_angle': rotation_angle,
+        'cloud_cover': item['properties'].get('eo:cloud_cover'),
+        'collection': collection,
+        'scene_id': item['id']
+    }
