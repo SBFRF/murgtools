@@ -1,7 +1,7 @@
 """murgtools - Tools for USACE FRF Coastal Model Test Bed data access."""
 
 from .getdata import getObs, getDataTestBed, gettime, getnc, removeDuplicatesFromDictionary
-from .getdata import forecastData, alt_PlotData
+from .getdata import forecastData, getSatelliteImagery, alt_PlotData
 
 __all__ = [
     "getObs",
@@ -10,5 +10,6 @@ __all__ = [
     "getnc",
     "removeDuplicatesFromDictionary",
     "forecastData",
+    "getSatelliteImagery",
     "alt_PlotData",
 ]

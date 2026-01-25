@@ -6,7 +6,7 @@ the USACE Field Research Facility (FRF) Coastal Model Test Bed (CMTB).
 """
 
 from .getDataFRF import getObs, getDataTestBed, gettime, getnc, removeDuplicatesFromDictionary
-from .getOutsideData import forecastData
+from .getOutsideData import forecastData, getSatelliteImagery
 from .getPlotData import alt_PlotData
 
 __version__ = "0.9.0"
@@ -20,5 +20,6 @@ __all__ = [
     "getnc",
     "removeDuplicatesFromDictionary",
     "forecastData",
+    "getSatelliteImagery",
     "alt_PlotData",
 ]
