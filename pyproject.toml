@@ -1,0 +1,111 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "getdatatestbed"
+version = "0.9.0"
+description = "Utilities for retrieving data from the USACE Field Research Facility Coastal Model Test Bed (CMTB)"
+readme = "README.md"
+license = {text = "BSD-3-Clause"}
+authors = [
+    {name = "Spicer Bak", email = "spicer.bak@usace.army.mil"}
+]
+maintainers = [
+    {name = "Spicer Bak", email = "spicer.bak@usace.army.mil"}
+]
+keywords = [
+    "oceanography",
+    "coastal",
+    "data-retrieval",
+    "netcdf",
+    "thredds",
+    "frf",
+    "usace",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Topic :: Scientific/Engineering :: GIS",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.20.1",
+    "pandas>=1.2.4",
+    "netCDF4>=1.5.7",
+    "scikit-image>=0.18.1",
+    "pyproj>=3.0.0",
+    "matplotlib>=3.0.0",
+    "scipy>=1.6.0",
+    "python-dateutil>=2.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "flake8>=5.0.0",
+    "pydocstyle>=6.0.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/SBFRF/getdatatestbed"
+Repository = "https://github.com/SBFRF/getdatatestbed"
+Documentation = "https://github.com/SBFRF/getdatatestbed#readme"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["getdatatestbed*"]
+exclude = ["tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+
+[tool.flake8]
+max-line-length = 120
+max-complexity = 10
+select = ["E9", "F63", "F7", "F82"]
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[tool.pydocstyle]
+convention = "google"
+
+[tool.coverage.run]
+source = ["getdatatestbed"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

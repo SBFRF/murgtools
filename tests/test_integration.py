@@ -3,27 +3,13 @@ import datetime as DT
 import numpy as np
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
-import sys
-
-
-# Mock testbedutils before importing modules
-mock_sblib = MagicMock()
-mock_sblib.baseRound = lambda x, base: np.round(np.array(x) / base) * base
-mock_sblib.reduceDict = lambda d, idx: {k: (v[idx] if hasattr(v, '__getitem__') and not isinstance(v, str) else v) for k, v in d.items()}
-
-mock_gp = MagicMock()
-mock_gp.FRFcoord = lambda lon, lat: {'xFRF': 500.0, 'yFRF': 100.0}
-
-sys.modules['testbedutils'] = MagicMock()
-sys.modules['testbedutils.geoprocess'] = mock_gp
-sys.modules['testbedutils.sblib'] = mock_sblib
 
 
 class TestGetnc:
     """Tests for the getnc function with mocked network."""
 
-    @patch('getDataFRF.socket.gethostbyname')
-    @patch('getDataFRF.nc.Dataset')
+    @patch('getdatatestbed.getDataFRF.socket.gethostbyname')
+    @patch('getdatatestbed.getDataFRF.nc.Dataset')
     def test_getnc_selects_chl_server_for_external_ip(self, mock_dataset, mock_gethostbyname):
         """Test that getnc selects CHL server for non-FRF IPs."""
         mock_gethostbyname.return_value = '192.168.1.1'
@@ -36,7 +22,7 @@ class TestGetnc:
         mock_ds.__getitem__ = MagicMock(return_value=mock_time)
         mock_dataset.return_value = mock_ds
 
-        from getDataFRF import getnc
+        from getdatatestbed.getDataFRF import getnc
 
         result = getnc('oceanography/waves/waverider-26m.ncml', 'getObs')
 
@@ -44,8 +30,8 @@ class TestGetnc:
         call_args = mock_dataset.call_args[0][0]
         assert 'chldata.erdc.dren.mil' in call_args or 'chlthredds' in call_args
 
-    @patch('getDataFRF.socket.gethostbyname')
-    @patch('getDataFRF.nc.Dataset')
+    @patch('getdatatestbed.getDataFRF.socket.gethostbyname')
+    @patch('getdatatestbed.getDataFRF.nc.Dataset')
     def test_getnc_selects_frf_server_for_internal_ip(self, mock_dataset, mock_gethostbyname):
         """Test that getnc selects FRF server for internal IPs."""
         mock_gethostbyname.return_value = '134.164.129.50'
@@ -57,7 +43,7 @@ class TestGetnc:
         mock_ds.__getitem__ = MagicMock(return_value=mock_time)
         mock_dataset.return_value = mock_ds
 
-        from getDataFRF import getnc
+        from getdatatestbed.getDataFRF import getnc
 
         result = getnc('oceanography/waves/waverider-26m.ncml', 'getObs', server='FRF')
 
@@ -65,8 +51,8 @@ class TestGetnc:
         call_args = mock_dataset.call_args[0][0]
         assert '134.164.129.55' in call_args
 
-    @patch('getDataFRF.socket.gethostbyname')
-    @patch('getDataFRF.nc.Dataset')
+    @patch('getdatatestbed.getDataFRF.socket.gethostbyname')
+    @patch('getdatatestbed.getDataFRF.nc.Dataset')
     def test_getnc_drills_to_monthly_file(self, mock_dataset, mock_gethostbyname):
         """Test that getnc drills down to monthly file when dates are in same month."""
         mock_gethostbyname.return_value = '192.168.1.1'
@@ -78,7 +64,7 @@ class TestGetnc:
         mock_ds.__getitem__ = MagicMock(return_value=mock_time)
         mock_dataset.return_value = mock_ds
 
-        from getDataFRF import getnc
+        from getdatatestbed.getDataFRF import getnc
 
         d1 = DT.datetime(2020, 1, 5)
         d2 = DT.datetime(2020, 1, 15)
@@ -96,8 +82,8 @@ class TestGetnc:
         assert '2020' in call_args
         assert '202001' in call_args or '01.nc' in call_args
 
-    @patch('getDataFRF.socket.gethostbyname')
-    @patch('getDataFRF.nc.Dataset')
+    @patch('getdatatestbed.getDataFRF.socket.gethostbyname')
+    @patch('getdatatestbed.getDataFRF.nc.Dataset')
     def test_getnc_retries_on_io_error(self, mock_dataset, mock_gethostbyname):
         """Test that getnc retries on IOError."""
         mock_gethostbyname.return_value = '192.168.1.1'
@@ -111,9 +97,9 @@ class TestGetnc:
 
         mock_dataset.side_effect = [IOError("Network error"), IOError("Network error"), mock_ds]
 
-        from getDataFRF import getnc
+        from getdatatestbed.getDataFRF import getnc
 
-        with patch('getDataFRF.time.sleep'):  # Don't actually sleep in tests
+        with patch('getdatatestbed.getDataFRF.time.sleep'):  # Don't actually sleep in tests
             result = getnc('test/data.ncml', 'getObs')
 
         # Should have tried 3 times
@@ -123,8 +109,8 @@ class TestGetnc:
 class TestGetObsWaveDataIntegration:
     """Integration tests for getObs.getWaveData with mocked network."""
 
-    @patch('getDataFRF.socket.gethostbyname')
-    @patch('getDataFRF.nc.Dataset')
+    @patch('getdatatestbed.getDataFRF.socket.gethostbyname')
+    @patch('getdatatestbed.getDataFRF.nc.Dataset')
     def test_getwavedata_returns_expected_keys(self, mock_dataset, mock_gethostbyname):
         """Test that getWaveData returns dictionary with expected keys."""
         mock_gethostbyname.return_value = '192.168.1.1'
@@ -159,10 +145,10 @@ class TestGetObsWaveDataIntegration:
         d1 = DT.datetime(2020, 1, 1, 0, 0, 0)
         d2 = DT.datetime(2020, 1, 1, 12, 0, 0)
 
-        with patch('getDataFRF.nc.num2date') as mock_num2date:
+        with patch('getdatatestbed.getDataFRF.nc.num2date') as mock_num2date:
             mock_num2date.return_value = np.array([d1 + DT.timedelta(minutes=30*i) for i in range(24)])
 
-            from getDataFRF import getObs
+            from getdatatestbed.getDataFRF import getObs
             obs = getObs(d1, d2)
 
             # This would require more extensive mocking to fully work,
@@ -180,10 +166,10 @@ class TestGetDataTestBedIntegration:
         d1 = DT.datetime(2020, 1, 1, 0, 0, 0)
         d2 = DT.datetime(2020, 1, 2, 0, 0, 0)
 
-        with patch('getDataFRF.nc.date2num') as mock_date2num:
+        with patch('getdatatestbed.getDataFRF.nc.date2num') as mock_date2num:
             mock_date2num.return_value = 1577836800.0
 
-            from getDataFRF import getDataTestBed
+            from getdatatestbed.getDataFRF import getDataTestBed
 
             tb = getDataTestBed(d1, d2)
 
@@ -197,10 +183,10 @@ class TestGetDataTestBedIntegration:
         d1 = DT.datetime(2020, 1, 1, 0, 0, 0)
         d2 = DT.datetime(2020, 1, 2, 0, 0, 0)
 
-        with patch('getDataFRF.nc.date2num') as mock_date2num:
+        with patch('getdatatestbed.getDataFRF.nc.date2num') as mock_date2num:
             mock_date2num.return_value = 1577836800.0
 
-            from getDataFRF import getDataTestBed
+            from getdatatestbed.getDataFRF import getDataTestBed
 
             tb = getDataTestBed(d1, d2)
 

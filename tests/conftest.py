@@ -50,19 +50,6 @@ def sample_dict_with_duplicates():
 
 
 @pytest.fixture
-def mock_testbedutils():
-    """Mock the testbedutils module for tests that don't need real network access."""
-    with patch.dict('sys.modules', {
-        'testbedutils': MagicMock(),
-        'testbedutils.geoprocess': MagicMock(),
-        'testbedutils.sblib': MagicMock(),
-        'testbedutils.anglesLib': MagicMock(),
-        'testbedutils.gridTools': MagicMock(),
-    }):
-        yield
-
-
-@pytest.fixture
 def mock_netcdf_dataset():
     """Mock netCDF4.Dataset for testing without network access."""
     mock_ds = MagicMock()

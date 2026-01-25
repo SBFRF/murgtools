@@ -1,0 +1,14 @@
+include LICENSE
+include README.md
+include requirements.txt
+include requirements-test.txt
+include pyproject.toml
+
+recursive-include getdatatestbed *.py
+
+prune tests
+prune .github
+prune .claude
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude *.egg-info

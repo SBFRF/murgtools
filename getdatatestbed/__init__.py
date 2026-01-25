@@ -1,0 +1,24 @@
+"""
+getdatatestbed - Python library for accessing USACE FRF Coastal Model Test Bed data.
+
+This package provides utilities for retrieving observational and model data from
+the USACE Field Research Facility (FRF) Coastal Model Test Bed (CMTB).
+"""
+
+from .getDataFRF import getObs, getDataTestBed, gettime, getnc, removeDuplicatesFromDictionary
+from .getOutsideData import forecastData
+from .getPlotData import alt_PlotData
+
+__version__ = "0.9.0"
+__author__ = "Spicer Bak"
+__email__ = "spicer.bak@usace.army.mil"
+
+__all__ = [
+    "getObs",
+    "getDataTestBed",
+    "gettime",
+    "getnc",
+    "removeDuplicatesFromDictionary",
+    "forecastData",
+    "alt_PlotData",
+]

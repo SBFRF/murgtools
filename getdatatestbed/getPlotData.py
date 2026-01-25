@@ -5,11 +5,11 @@
 @organization: USACE CHL FRF
 """
 from .getDataFRF import getObs
-from testbedutils.anglesLib import vectorRotation
+from .testbedutils.anglesLib import vectorRotation
 import datetime as DT
 import numpy as np
-from testbedutils.gridTools import findNearestUnstructNode
-import testbedutils.sblib as sb
+from .testbedutils.gridTools import findNearestUnstructNode
+from .testbedutils import sblib as sb
 import netCDF4 as nc
 
 def alt_PlotData(name, mod_time, mod_times, THREDDS='FRF'):
