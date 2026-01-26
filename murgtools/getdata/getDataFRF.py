@@ -3319,3 +3319,152 @@ class getDataTestBed:
                'runupMean':  ncfile['runupMean'][dataIndex],
                'runup2perc': ncfile['runup2perc'][dataIndex]}
         return mod
+
+
+def getArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=True):
+    """Retrieve Argus orthophoto imagery from the FRF coastal imaging server.
+
+    Argus images are available every 30 minutes from the FRF tower. This function
+    downloads GeoTIFF orthophotos from the coastalimaging.erdc.dren.mil server.
+
+    Args:
+        dateOfInterest (datetime): Target datetime for image retrieval.
+            Will be rounded to nearest 30-minute interval.
+        filename (str, optional): Path to save the GeoTIFF file. If None,
+            returns image in memory only. Defaults to None.
+        imageType (str, optional): Type of Argus image product. Options are:
+            'timex' (time exposure average, default), 'var' (variance),
+            'snap' (snapshot), 'brightest', 'darkest'.
+        verbose (bool, optional): Enable logging output. Defaults to True.
+
+    Returns:
+        dict: Dictionary containing:
+            - 'image': numpy.ndarray (H, W, 3) uint8 RGB image
+            - 'time': datetime object of image capture time
+            - 'epochtime': float, seconds since 1970-01-01
+            - 'imageType': str, image type used
+            - 'filename': str, path if saved (None otherwise)
+            - 'url': str, source URL
+        Returns None if image not found.
+
+    Example:
+        >>> import datetime as DT
+        >>> result = getArgusImagery(DT.datetime(2024, 6, 15, 12, 0, 0))
+        >>> if result:
+        ...     print(result['time'], result['image'].shape)
+
+    """
+    import requests
+    import tifffile
+    import tempfile
+
+    if verbose:
+        logging.basicConfig(level=logging.INFO)
+
+    # Validate imageType
+    valid_types = ['timex', 'var', 'snap', 'brightest', 'darkest']
+    if imageType.lower() not in valid_types:
+        raise ValueError(f"Invalid imageType '{imageType}'. Must be one of: {valid_types}")
+
+    # Round to nearest 30 minutes
+    minutes = dateOfInterest.minute
+    if minutes < 15:
+        rounded_minutes = 0
+    elif minutes < 45:
+        rounded_minutes = 30
+    else:
+        rounded_minutes = 0
+        dateOfInterest = dateOfInterest + DT.timedelta(hours=1)
+
+    roundedTime = dateOfInterest.replace(minute=rounded_minutes, second=0, microsecond=0)
+
+    # Construct URL
+    baseURL = "https://coastalimaging.erdc.dren.mil/FrfTower/Processed/Orthophotos/cxgeo/"
+    fldr = roundedTime.strftime("%Y_%m_%d")
+    fname = f'{roundedTime.strftime("%Y%m%dT%H%M%SZ")}.FrfTower.cxgeo.{imageType}.tif'
+    url = urljoin(baseURL, fldr, fname)
+
+    logging.info(f"Retrieving Argus imagery from {url}")
+
+    # Download the image
+    try:
+        resp = requests.get(url, stream=True, timeout=60)
+        resp.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logging.warning(f"Failed to retrieve Argus imagery: {e}")
+        return None
+
+    # Save to file or temp file
+    if filename is not None:
+        with open(filename, 'wb') as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                f.write(chunk)
+        image = tifffile.imread(filename)
+    else:
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+            for chunk in resp.iter_content(chunk_size=8192):
+                tmp.write(chunk)
+        try:
+            image = tifffile.imread(tmp_path)
+        finally:
+            os.unlink(tmp_path)
+
+    # Ensure uint8 RGB format
+    if image.dtype != np.uint8:
+        image = np.clip(image / image.max() * 255, 0, 255).astype(np.uint8)
+
+    # Compute epoch time
+    epochtime = nc.date2num(roundedTime, 'seconds since 1970-01-01')
+
+    logging.info(f"Retrieved Argus {imageType} image: {image.shape}")
+
+    return {
+        'image': image,
+        'time': roundedTime,
+        'epochtime': epochtime,
+        'imageType': imageType,
+        'filename': filename,
+        'url': url,
+    }
+
+
+def threadGetArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=True):
+    """Retrieve Argus imagery in a background thread (non-blocking).
+
+    Spawns a daemon thread to download the image and returns immediately
+    with the output filename.
+
+    Args:
+        dateOfInterest (datetime): Target datetime for image retrieval.
+            Will be rounded to nearest 30-minute interval.
+        filename (str, optional): Path to save the GeoTIFF file. If None,
+            generates default filename in current directory.
+        imageType (str, optional): Type of Argus image product. Options are:
+            'timex' (default), 'var', 'snap', 'brightest', 'darkest'.
+        verbose (bool, optional): Enable logging output. Defaults to True.
+
+    Returns:
+        str: Output filename where image will be saved.
+
+    Example:
+        >>> import datetime as DT
+        >>> filename = threadGetArgusImagery(DT.datetime(2024, 6, 15, 12, 0, 0))
+        >>> print(f"Downloading to: {filename}")
+
+    """
+    import threading
+
+    if filename is None:
+        filename = os.path.join(
+            os.getcwd(), f'Argus_{imageType}_{dateOfInterest.strftime("%Y%m%dT%H%M%SZ")}.tif'
+        )
+
+    t = threading.Thread(
+        target=getArgusImagery,
+        args=[dateOfInterest],
+        kwargs={'filename': filename, 'imageType': imageType, 'verbose': verbose},
+        daemon=True
+    )
+    t.start()
+    return filename

@@ -176,3 +176,153 @@ class TestGetDataTestBedClass:
         assert hasattr(tb, 'FRFdataloc')
         assert hasattr(tb, 'chlDataLoc')
         assert hasattr(tb, 'crunchDataLoc')
+
+
+class TestGetArgusImagery:
+    """Tests for the getArgusImagery function."""
+
+    def test_invalid_image_type_raises_error(self):
+        """Test that invalid imageType raises ValueError."""
+        from murgtools.getdata.getDataFRF import getArgusImagery
+
+        with pytest.raises(ValueError, match="Invalid imageType"):
+            getArgusImagery(DT.datetime(2024, 6, 15, 12, 0, 0), imageType="invalid")
+
+    def test_valid_image_types_accepted(self):
+        """Test that all valid image types are accepted."""
+        from murgtools.getdata.getDataFRF import getArgusImagery
+        import requests
+
+        valid_types = ['timex', 'var', 'snap', 'brightest', 'darkest']
+        for img_type in valid_types:
+            # Patch at the requests module level since it's imported locally
+            with patch.object(requests, 'get') as mock_get:
+                mock_get.side_effect = requests.exceptions.RequestException("Network disabled")
+                # Should not raise ValueError for valid image types
+                result = getArgusImagery(
+                    DT.datetime(2024, 6, 15, 12, 0, 0),
+                    imageType=img_type,
+                    verbose=False
+                )
+                assert result is None  # Network error returns None
+
+    def test_time_rounding_to_30_minutes(self):
+        """Test that times are rounded to nearest 30 minutes."""
+        from murgtools.getdata.getDataFRF import getArgusImagery
+        import requests
+
+        test_cases = [
+            (DT.datetime(2024, 6, 15, 12, 10, 0), "120000"),  # rounds down to 12:00
+            (DT.datetime(2024, 6, 15, 12, 20, 0), "123000"),  # rounds up to 12:30
+            (DT.datetime(2024, 6, 15, 12, 40, 0), "123000"),  # rounds down to 12:30
+            (DT.datetime(2024, 6, 15, 12, 50, 0), "130000"),  # rounds up to 13:00
+        ]
+
+        for input_time, expected_time_str in test_cases:
+            with patch.object(requests, 'get') as mock_get:
+                mock_get.side_effect = requests.exceptions.RequestException("Network disabled")
+                getArgusImagery(input_time, verbose=False)
+
+                # Verify the URL constructed contains the expected time
+                call_args = mock_get.call_args
+                assert call_args is not None, f"requests.get was not called for {input_time}"
+                url = call_args[0][0]
+                assert expected_time_str in url, f"Expected {expected_time_str} in URL {url}"
+
+    def test_url_construction(self):
+        """Test that URL is constructed correctly."""
+        from murgtools.getdata.getDataFRF import getArgusImagery
+        import requests
+
+        with patch.object(requests, 'get') as mock_get:
+            mock_get.side_effect = requests.exceptions.RequestException("Network disabled")
+            getArgusImagery(DT.datetime(2024, 6, 15, 12, 0, 0), imageType="timex", verbose=False)
+
+            call_args = mock_get.call_args
+            url = call_args[0][0]
+
+            assert "coastalimaging.erdc.dren.mil" in url
+            assert "FrfTower/Processed/Orthophotos/cxgeo" in url
+            assert "2024_06_15" in url
+            assert "20240615T120000Z" in url
+            assert "timex.tif" in url
+
+    @pytest.mark.slow
+    def test_successful_image_retrieval(self):
+        """Test successful image retrieval (requires network)."""
+        from murgtools.getdata.getDataFRF import getArgusImagery
+
+        # Use a known date when imagery is likely available
+        result = getArgusImagery(DT.datetime(2024, 6, 15, 12, 0, 0))
+
+        if result is not None:
+            assert 'image' in result
+            assert 'time' in result
+            assert 'epochtime' in result
+            assert 'imageType' in result
+            assert 'url' in result
+            assert isinstance(result['image'], np.ndarray)
+            assert result['imageType'] == 'timex'
+
+    def test_returns_none_on_network_error(self):
+        """Test that function returns None on network error."""
+        from murgtools.getdata.getDataFRF import getArgusImagery
+        import requests
+
+        with patch.object(requests, 'get') as mock_get:
+            mock_get.side_effect = requests.exceptions.RequestException("Connection failed")
+            result = getArgusImagery(DT.datetime(2024, 6, 15, 12, 0, 0), verbose=False)
+
+            assert result is None
+
+
+class TestThreadGetArgusImagery:
+    """Tests for the threadGetArgusImagery function."""
+
+    def test_returns_filename_immediately(self):
+        """Test that function returns filename immediately without blocking."""
+        from murgtools.getdata.getDataFRF import threadGetArgusImagery
+        import time
+
+        with patch('murgtools.getdata.getDataFRF.getArgusImagery') as mock_get:
+            # Make the mock slow to ensure we're not waiting
+            def slow_get(*args, **kwargs):
+                time.sleep(10)
+                return None
+            mock_get.side_effect = slow_get
+
+            start = time.time()
+            filename = threadGetArgusImagery(DT.datetime(2024, 6, 15, 12, 0, 0))
+            elapsed = time.time() - start
+
+            # Should return almost immediately (less than 1 second)
+            assert elapsed < 1.0
+            assert filename is not None
+            assert filename.endswith('.tif')
+
+    def test_generates_default_filename(self):
+        """Test that default filename is generated correctly."""
+        from murgtools.getdata.getDataFRF import threadGetArgusImagery
+
+        with patch('murgtools.getdata.getDataFRF.getArgusImagery'):
+            filename = threadGetArgusImagery(
+                DT.datetime(2024, 6, 15, 12, 0, 0),
+                imageType="var"
+            )
+
+            assert "Argus_var_" in filename
+            assert "20240615T120000Z" in filename
+            assert filename.endswith('.tif')
+
+    def test_uses_provided_filename(self):
+        """Test that provided filename is used."""
+        from murgtools.getdata.getDataFRF import threadGetArgusImagery
+
+        with patch('murgtools.getdata.getDataFRF.getArgusImagery'):
+            custom_filename = "/tmp/my_custom_argus.tif"
+            filename = threadGetArgusImagery(
+                DT.datetime(2024, 6, 15, 12, 0, 0),
+                filename=custom_filename
+            )
+
+            assert filename == custom_filename

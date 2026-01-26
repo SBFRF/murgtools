@@ -2,6 +2,7 @@
 
 from .getdata import getObs, getDataTestBed, gettime, getnc, removeDuplicatesFromDictionary
 from .getdata import forecastData, getSatelliteImagery, alt_PlotData
+from .getdata import getArgusImagery, threadGetArgusImagery
 
 __all__ = [
     "getObs",
@@ -11,5 +12,7 @@ __all__ = [
     "removeDuplicatesFromDictionary",
     "forecastData",
     "getSatelliteImagery",
+    "getArgusImagery",
+    "threadGetArgusImagery",
     "alt_PlotData",
 ]

@@ -5,7 +5,8 @@ This package provides utilities for retrieving observational and model data from
 the USACE Field Research Facility (FRF) Coastal Model Test Bed (CMTB).
 """
 
-from .getDataFRF import getObs, getDataTestBed, gettime, getnc, removeDuplicatesFromDictionary
+from .getDataFRF import (getObs, getDataTestBed, gettime, getnc, removeDuplicatesFromDictionary,
+                         getArgusImagery, threadGetArgusImagery)
 from .getOutsideData import forecastData, getSatelliteImagery
 from .getPlotData import alt_PlotData
 
@@ -21,5 +22,7 @@ __all__ = [
     "removeDuplicatesFromDictionary",
     "forecastData",
     "getSatelliteImagery",
+    "getArgusImagery",
+    "threadGetArgusImagery",
     "alt_PlotData",
 ]
