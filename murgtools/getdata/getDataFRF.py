@@ -3321,6 +3321,43 @@ class getDataTestBed:
         return mod
 
 
+def get_geotiff_extent(filepath):
+    """Extract matplotlib extent from GeoTIFF using tifffile.
+
+    Parses GeoTIFF tags (ModelTiepointTag and ModelPixelScaleTag) to compute
+    geographic bounds suitable for matplotlib imshow extent parameter.
+
+    Args:
+        filepath (str): Path to GeoTIFF file.
+
+    Returns:
+        list: [left, right, bottom, top] extent in geographic coordinates
+            (typically lon/lat or projected coordinates depending on the GeoTIFF).
+
+    Raises:
+        KeyError: If required GeoTIFF tags are not present in the file.
+
+    Example:
+        >>> extent = get_geotiff_extent('/path/to/image.tif')
+        >>> plt.imshow(image, extent=extent)
+
+    """
+    import tifffile
+
+    with tifffile.TiffFile(filepath) as tif:
+        tags = tif.pages[0].tags
+        # GeoTIFF tags: 33922=ModelTiepointTag, 33550=ModelPixelScaleTag
+        tiepoint = tags[33922].value  # (i, j, k, x, y, z)
+        scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
+        height, width = tif.pages[0].shape[:2]
+        # Compute extent: [left, right, bottom, top]
+        left = tiepoint[3]
+        top = tiepoint[4]
+        right = left + width * scale[0]
+        bottom = top - height * scale[1]
+        return [left, right, bottom, top]
+
+
 def getArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=True):
     """Retrieve Argus orthophoto imagery from the FRF coastal imaging server.
 
