@@ -3371,7 +3371,7 @@ def getArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=Tr
             returns image in memory only. Defaults to None.
         imageType (str, optional): Type of Argus image product. Options are:
             'timex' (time exposure average, default), 'var' (variance),
-            'snap' (snapshot), 'brightest', 'darkest'.
+            'snap' (snapshot), 'bright' (brightest pixels), 'dark' (darkest pixels).
         verbose (bool, optional): Enable logging output. Defaults to True.
 
     Returns:
@@ -3399,7 +3399,7 @@ def getArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=Tr
         logging.basicConfig(level=logging.INFO)
 
     # Validate imageType
-    valid_types = ['timex', 'var', 'snap', 'brightest', 'darkest']
+    valid_types = ['timex', 'var', 'snap', 'bright', 'dark']
     if imageType.lower() not in valid_types:
         raise ValueError(f"Invalid imageType '{imageType}'. Must be one of: {valid_types}")
 
@@ -3478,7 +3478,7 @@ def threadGetArgusImagery(dateOfInterest, filename=None, imageType="timex", verb
         filename (str, optional): Path to save the GeoTIFF file. If None,
             generates default filename in current directory.
         imageType (str, optional): Type of Argus image product. Options are:
-            'timex' (default), 'var', 'snap', 'brightest', 'darkest'.
+            'timex' (default), 'var', 'snap', 'bright', 'dark'.
         verbose (bool, optional): Enable logging output. Defaults to True.
 
     Returns:
@@ -3505,3 +3505,106 @@ def threadGetArgusImagery(dateOfInterest, filename=None, imageType="timex", verb
     )
     t.start()
     return filename
+
+
+def findArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=True,
+                     search_window_hours=24, method=0):
+    """Find available Argus imagery with configurable search strategy.
+
+    Wrapper around getArgusImagery that searches for available imagery
+    when the exact requested time is not available.
+
+    Args:
+        dateOfInterest (datetime): Target datetime for image retrieval.
+        filename (str, optional): Path to save the GeoTIFF file. If None,
+            returns image in memory only. Defaults to None.
+        imageType (str, optional): Type of Argus image product. Options are:
+            'timex' (time exposure average, default), 'var' (variance),
+            'snap' (snapshot), 'bright' (brightest pixels), 'dark' (darkest pixels).
+        verbose (bool, optional): Enable logging output. Defaults to True.
+        search_window_hours (int, optional): Hours to search for available
+            imagery. Default 24 hours.
+        method (int, optional): Search strategy. Options are:
+            0 = Nearest in TIME (bidirectional, returns closest available)
+            1 = Nearest in HISTORY (backward only, returns most recent before target)
+            Defaults to 0.
+
+    Returns:
+        dict: Same as getArgusImagery, plus:
+            - 'time_requested': original requested datetime (rounded to 30-min)
+            - 'time_offset_minutes': offset from requested time (negative=earlier)
+        Returns None if no image found within search window.
+
+    Example:
+        >>> import datetime as DT
+        >>> # Find nearest available image to now
+        >>> result = findArgusImagery(DT.datetime.now(), method=0)
+        >>> if result:
+        ...     print(f"Found image {result['time_offset_minutes']} min from requested")
+        >>> # Find most recent image before target (for operational use)
+        >>> result = findArgusImagery(DT.datetime.now(), method=1)
+
+    """
+    if verbose:
+        logging.basicConfig(level=logging.INFO)
+
+    # Round to nearest 30 minutes (same logic as getArgusImagery)
+    minutes = dateOfInterest.minute
+    if minutes < 15:
+        rounded_minutes = 0
+        rounded_time = dateOfInterest
+    elif minutes < 45:
+        rounded_minutes = 30
+        rounded_time = dateOfInterest
+    else:
+        rounded_minutes = 0
+        rounded_time = dateOfInterest + DT.timedelta(hours=1)
+    time_requested = rounded_time.replace(minute=rounded_minutes, second=0, microsecond=0)
+
+    # Calculate max number of 30-min slots to search
+    max_slots = int(search_window_hours * 2)
+
+    # Generate candidate timestamps based on method
+    candidates = [time_requested]  # Always try exact time first
+
+    if method == 0:
+        # Nearest in TIME: alternating offsets [-30, +30, -60, +60, ...]
+        for i in range(1, max_slots + 1):
+            offset_minutes = i * 30
+            candidates.append(time_requested - DT.timedelta(minutes=offset_minutes))
+            candidates.append(time_requested + DT.timedelta(minutes=offset_minutes))
+    elif method == 1:
+        # Nearest in HISTORY: backward only [-30, -60, -90, ...]
+        for i in range(1, max_slots + 1):
+            offset_minutes = i * 30
+            candidates.append(time_requested - DT.timedelta(minutes=offset_minutes))
+    else:
+        raise ValueError(f"Invalid method {method}. Must be 0 (nearest in time) or 1 (nearest in history).")
+
+    # Try each candidate until we find one
+    for candidate_time in candidates:
+        if verbose:
+            logging.info(f"Trying Argus imagery for {candidate_time.strftime('%Y-%m-%d %H:%M')}...")
+
+        result = getArgusImagery(candidate_time, filename=filename, imageType=imageType, verbose=False)
+
+        if result is not None:
+            # Calculate offset from requested time
+            time_offset = candidate_time - time_requested
+            time_offset_minutes = int(time_offset.total_seconds() / 60)
+
+            # Add search metadata to result
+            result['time_requested'] = time_requested
+            result['time_offset_minutes'] = time_offset_minutes
+
+            if verbose:
+                logging.info(f"Found Argus {imageType} image at {candidate_time.strftime('%Y-%m-%d %H:%M')} "
+                           f"(offset: {time_offset_minutes} minutes)")
+
+            return result
+
+    # No image found within search window
+    if verbose:
+        logging.warning(f"No Argus imagery found within {search_window_hours} hours of "
+                       f"{time_requested.strftime('%Y-%m-%d %H:%M')}")
+    return None
