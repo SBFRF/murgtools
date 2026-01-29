@@ -26,18 +26,15 @@ def main():
     # Initialize the observation data retriever
     obs = getObs(d1, d2)
 
-    # All available wave gauges
+    # Wave gauges with recent data (others may have historical data only)
     gauge_list = [
         'waverider-26m',
         'waverider-17m',
         'awac-11m',
-        '8m-array',
-        'awac-6m',
-        'awac-4.5m',
-        'adop-3.5m',
-        'xp200m',
-        'xp150m',
-        'xp125m',
+        'sig940-300',
+        'lidarwavegauge140',
+        'lidarwavegauge110',
+        'lidarwavegauge100',
     ]
 
     # Retrieve wave data from all gauges
@@ -108,7 +105,7 @@ def main():
         tmp_path = tmp.name
 
     try:
-        argus_result = getArgusImagery(now, filename=tmp_path, imageType='timex')
+        argus_result = getArgusImagery(now, filename=tmp_path, imageType='brightest')
         if argus_result:
             print(f"  Got Argus image from {argus_result['time'].strftime('%Y-%m-%d %H:%M')}")
             print(f"  Shape: {argus_result['image'].shape}")
