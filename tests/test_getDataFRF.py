@@ -193,7 +193,7 @@ class TestGetArgusImagery:
         from murgtools.getdata.getDataFRF import getArgusImagery
         import requests
 
-        valid_types = ['timex', 'var', 'snap', 'brightest', 'darkest']
+        valid_types = ['timex', 'var', 'snap', 'bright', 'dark']
         for img_type in valid_types:
             # Patch at the requests module level since it's imported locally
             with patch.object(requests, 'get') as mock_get:
