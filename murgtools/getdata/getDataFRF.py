@@ -3319,3 +3319,292 @@ class getDataTestBed:
                'runupMean':  ncfile['runupMean'][dataIndex],
                'runup2perc': ncfile['runup2perc'][dataIndex]}
         return mod
+
+
+def get_geotiff_extent(filepath):
+    """Extract matplotlib extent from GeoTIFF using tifffile.
+
+    Parses GeoTIFF tags (ModelTiepointTag and ModelPixelScaleTag) to compute
+    geographic bounds suitable for matplotlib imshow extent parameter.
+
+    Args:
+        filepath (str): Path to GeoTIFF file.
+
+    Returns:
+        list: [left, right, bottom, top] extent in geographic coordinates
+            (typically lon/lat or projected coordinates depending on the GeoTIFF).
+
+    Raises:
+        KeyError: If required GeoTIFF tags are not present in the file.
+
+    Example:
+        >>> extent = get_geotiff_extent('/path/to/image.tif')
+        >>> plt.imshow(image, extent=extent)
+
+    """
+    import tifffile
+
+    with tifffile.TiffFile(filepath) as tif:
+        tags = tif.pages[0].tags
+        # GeoTIFF tags: 33922=ModelTiepointTag, 33550=ModelPixelScaleTag
+        tiepoint = tags[33922].value  # (i, j, k, x, y, z)
+        scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
+        height, width = tif.pages[0].shape[:2]
+        # Compute extent: [left, right, bottom, top]
+        left = tiepoint[3]
+        top = tiepoint[4]
+        right = left + width * scale[0]
+        bottom = top - height * scale[1]
+        return [left, right, bottom, top]
+
+
+def getArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=True):
+    """Retrieve Argus orthophoto imagery from the FRF coastal imaging server.
+
+    Argus images are available every 30 minutes from the FRF tower. This function
+    downloads GeoTIFF orthophotos from the coastalimaging.erdc.dren.mil server.
+
+    Args:
+        dateOfInterest (datetime): Target datetime for image retrieval.
+            Will be rounded to nearest 30-minute interval.
+        filename (str, optional): Path to save the GeoTIFF file. If None,
+            returns image in memory only. Defaults to None.
+        imageType (str, optional): Type of Argus image product. Options are:
+            'timex' (time exposure average, default), 'var' (variance),
+            'snap' (snapshot), 'bright' (brightest pixels), 'dark' (darkest pixels).
+        verbose (bool, optional): Enable logging output. Defaults to True.
+
+    Returns:
+        dict: Dictionary containing:
+            - 'image': numpy.ndarray (H, W, 3) uint8 RGB image
+            - 'time': datetime object of image capture time
+            - 'epochtime': float, seconds since 1970-01-01
+            - 'imageType': str, image type used
+            - 'filename': str, path if saved (None otherwise)
+            - 'url': str, source URL
+        Returns None if image not found.
+
+    Example:
+        >>> import datetime as DT
+        >>> result = getArgusImagery(DT.datetime(2024, 6, 15, 12, 0, 0))
+        >>> if result:
+        ...     print(result['time'], result['image'].shape)
+
+    """
+    import requests
+    import tifffile
+    import tempfile
+
+    if verbose:
+        logging.basicConfig(level=logging.INFO)
+
+    # Validate imageType
+    valid_types = ['timex', 'var', 'snap', 'bright', 'dark']
+    if imageType.lower() not in valid_types:
+        raise ValueError(f"Invalid imageType '{imageType}'. Must be one of: {valid_types}")
+
+    # Round to nearest 30 minutes
+    minutes = dateOfInterest.minute
+    if minutes < 15:
+        rounded_minutes = 0
+    elif minutes < 45:
+        rounded_minutes = 30
+    else:
+        rounded_minutes = 0
+        dateOfInterest = dateOfInterest + DT.timedelta(hours=1)
+
+    roundedTime = dateOfInterest.replace(minute=rounded_minutes, second=0, microsecond=0)
+
+    # Construct URL
+    baseURL = "https://coastalimaging.erdc.dren.mil/FrfTower/Processed/Orthophotos/cxgeo/"
+    fldr = roundedTime.strftime("%Y_%m_%d")
+    fname = f'{roundedTime.strftime("%Y%m%dT%H%M%SZ")}.FrfTower.cxgeo.{imageType}.tif'
+    url = urljoin(baseURL, fldr, fname)
+
+    logging.info(f"Retrieving Argus imagery from {url}")
+
+    # Download the image
+    try:
+        resp = requests.get(url, stream=True, timeout=60)
+        resp.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logging.warning(f"Failed to retrieve Argus imagery: {e}")
+        return None
+
+    # Save to file or temp file
+    if filename is not None:
+        with open(filename, 'wb') as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                f.write(chunk)
+        image = tifffile.imread(filename)
+    else:
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+            for chunk in resp.iter_content(chunk_size=8192):
+                tmp.write(chunk)
+        try:
+            image = tifffile.imread(tmp_path)
+        finally:
+            os.unlink(tmp_path)
+
+    # Ensure uint8 RGB format
+    if image.dtype != np.uint8:
+        image = np.clip(image / image.max() * 255, 0, 255).astype(np.uint8)
+
+    # Compute epoch time
+    epochtime = nc.date2num(roundedTime, 'seconds since 1970-01-01')
+
+    logging.info(f"Retrieved Argus {imageType} image: {image.shape}")
+
+    return {
+        'image': image,
+        'time': roundedTime,
+        'epochtime': epochtime,
+        'imageType': imageType,
+        'filename': filename,
+        'url': url,
+    }
+
+
+def threadGetArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=True):
+    """Retrieve Argus imagery in a background thread (non-blocking).
+
+    Spawns a daemon thread to download the image and returns immediately
+    with the output filename.
+
+    Args:
+        dateOfInterest (datetime): Target datetime for image retrieval.
+            Will be rounded to nearest 30-minute interval.
+        filename (str, optional): Path to save the GeoTIFF file. If None,
+            generates default filename in current directory.
+        imageType (str, optional): Type of Argus image product. Options are:
+            'timex' (default), 'var', 'snap', 'bright', 'dark'.
+        verbose (bool, optional): Enable logging output. Defaults to True.
+
+    Returns:
+        str: Output filename where image will be saved.
+
+    Example:
+        >>> import datetime as DT
+        >>> filename = threadGetArgusImagery(DT.datetime(2024, 6, 15, 12, 0, 0))
+        >>> print(f"Downloading to: {filename}")
+
+    """
+    import threading
+
+    if filename is None:
+        filename = os.path.join(
+            os.getcwd(), f'Argus_{imageType}_{dateOfInterest.strftime("%Y%m%dT%H%M%SZ")}.tif'
+        )
+
+    t = threading.Thread(
+        target=getArgusImagery,
+        args=[dateOfInterest],
+        kwargs={'filename': filename, 'imageType': imageType, 'verbose': verbose},
+        daemon=True
+    )
+    t.start()
+    return filename
+
+
+def findArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=True,
+                     search_window_hours=24, method=0):
+    """Find available Argus imagery with configurable search strategy.
+
+    Wrapper around getArgusImagery that searches for available imagery
+    when the exact requested time is not available.
+
+    Args:
+        dateOfInterest (datetime): Target datetime for image retrieval.
+        filename (str, optional): Path to save the GeoTIFF file. If None,
+            returns image in memory only. Defaults to None.
+        imageType (str, optional): Type of Argus image product. Options are:
+            'timex' (time exposure average, default), 'var' (variance),
+            'snap' (snapshot), 'bright' (brightest pixels), 'dark' (darkest pixels).
+        verbose (bool, optional): Enable logging output. Defaults to True.
+        search_window_hours (int, optional): Hours to search for available
+            imagery. Default 24 hours.
+        method (int, optional): Search strategy. Options are:
+            0 = Nearest in TIME (bidirectional, returns closest available)
+            1 = Nearest in HISTORY (backward only, returns most recent before target)
+            Defaults to 0.
+
+    Returns:
+        dict: Same as getArgusImagery, plus:
+            - 'time_requested': original requested datetime (rounded to 30-min)
+            - 'time_offset_minutes': offset from requested time (negative=earlier)
+        Returns None if no image found within search window.
+
+    Example:
+        >>> import datetime as DT
+        >>> # Find nearest available image to now
+        >>> result = findArgusImagery(DT.datetime.now(), method=0)
+        >>> if result:
+        ...     print(f"Found image {result['time_offset_minutes']} min from requested")
+        >>> # Find most recent image before target (for operational use)
+        >>> result = findArgusImagery(DT.datetime.now(), method=1)
+
+    """
+    if verbose:
+        logging.basicConfig(level=logging.INFO)
+
+    # Round to nearest 30 minutes (same logic as getArgusImagery)
+    minutes = dateOfInterest.minute
+    if minutes < 15:
+        rounded_minutes = 0
+        rounded_time = dateOfInterest
+    elif minutes < 45:
+        rounded_minutes = 30
+        rounded_time = dateOfInterest
+    else:
+        rounded_minutes = 0
+        rounded_time = dateOfInterest + DT.timedelta(hours=1)
+    time_requested = rounded_time.replace(minute=rounded_minutes, second=0, microsecond=0)
+
+    # Calculate max number of 30-min slots to search
+    max_slots = int(search_window_hours * 2)
+
+    # Generate candidate timestamps based on method
+    candidates = [time_requested]  # Always try exact time first
+
+    if method == 0:
+        # Nearest in TIME: alternating offsets [-30, +30, -60, +60, ...]
+        for i in range(1, max_slots + 1):
+            offset_minutes = i * 30
+            candidates.append(time_requested - DT.timedelta(minutes=offset_minutes))
+            candidates.append(time_requested + DT.timedelta(minutes=offset_minutes))
+    elif method == 1:
+        # Nearest in HISTORY: backward only [-30, -60, -90, ...]
+        for i in range(1, max_slots + 1):
+            offset_minutes = i * 30
+            candidates.append(time_requested - DT.timedelta(minutes=offset_minutes))
+    else:
+        raise ValueError(f"Invalid method {method}. Must be 0 (nearest in time) or 1 (nearest in history).")
+
+    # Try each candidate until we find one
+    for candidate_time in candidates:
+        if verbose:
+            logging.info(f"Trying Argus imagery for {candidate_time.strftime('%Y-%m-%d %H:%M')}...")
+
+        result = getArgusImagery(candidate_time, filename=filename, imageType=imageType, verbose=False)
+
+        if result is not None:
+            # Calculate offset from requested time
+            time_offset = candidate_time - time_requested
+            time_offset_minutes = int(time_offset.total_seconds() / 60)
+
+            # Add search metadata to result
+            result['time_requested'] = time_requested
+            result['time_offset_minutes'] = time_offset_minutes
+
+            if verbose:
+                logging.info(f"Found Argus {imageType} image at {candidate_time.strftime('%Y-%m-%d %H:%M')} "
+                           f"(offset: {time_offset_minutes} minutes)")
+
+            return result
+
+    # No image found within search window
+    if verbose:
+        logging.warning(f"No Argus imagery found within {search_window_hours} hours of "
+                       f"{time_requested.strftime('%Y-%m-%d %H:%M')}")
+    return None
