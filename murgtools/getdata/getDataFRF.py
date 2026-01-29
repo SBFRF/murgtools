@@ -224,12 +224,14 @@ class getObs:
         """Data are returned in self.dataindex are inclusive at start, exclusive at end."""
         # this is active wave gauge list for looping through as needed
         self.waveGaugeList = ['waverider-26m', 'waverider-17m', 'awac-11m', '8m-array',
-                              'awac-6m', 'awac-4.5m', 'adop-3.5m', 'xp200m', 'xp150m', 'xp125m']
-        
+                              'awac-6m', 'awac-4.5m', 'adop-3.5m', 'xp200m', 'xp150m', 'xp125m',
+                              'sig940-300', 'sig769-300', 'lidarwavegauge140', 'lidarwavegauge110',
+                              'lidarwavegauge100']
+
         self.directionalWaveGaugeList = ['waverider-26m', 'waverider-17m', 'awac-11m', '8m-array',
-                                         'awac-6m', 'awac-4.5m', 'adop-3.5m']
+                                         'awac-6m', 'awac-4.5m', 'adop-3.5m', 'sig940-300', 'sig769-300']
         
-        self.currentsGaugeList = ['awac-11m', 'awac-6m', 'awac-4.5m', 'adop-3.5m']
+        self.currentsGaugeList = ['awac-11m', 'awac-6m', 'awac-4.5m', 'adop-3.5m', 'sig940-300', 'sig769-300']
         #self.rawdataloc_wave = []
         #self.outputdir = []  # location for outputfiles
         self.d1 = d1  # start date for data grab
@@ -326,7 +328,7 @@ class getObs:
         try:
             self.wavedataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
                                          epochEnd=self.epochd2)
-            assert np.array(self.wavedataindex).all() is not None, 'there''s no data in your time period'
+            assert self.wavedataindex is not None, 'there\'s no data in your time period'
 
             if np.size(self.wavedataindex) >= 1:
                 # consistant for all wave gauges
@@ -495,6 +497,10 @@ class getObs:
 
             gaugenumber = [6, 'adop-3.5m'] (Default value = 5)
 
+            gaugenumber = ['sig940-300', '940-300']
+
+            gaugenumber = ['sig769-300', '769-300']
+
           roundto: the time over which the wind record exists, ie data is collected in 10 minute
           increments
             data is rounded to the nearst [roundto] (default 1 min)
@@ -529,25 +535,31 @@ class getObs:
                 'meanP' (array): mean pressure
 
         """
-        assert gaugenumber.lower() in [2, 3, 4, 5, 6, 'awac-11m', 'awac-8m', 'awac-6m', 'awac-4.5m',
-                                       'adop-3.5m'], 'Input string/number is not a valid gage ' \
-                                                     'name/number'
-        
-        if gaugenumber in [2, 'awac-11m']:
+        assert str(gaugenumber).lower() in ['2', '3', '4', '5', '6', 'awac-11m', 'awac-8m', 'awac-6m', 'awac-4.5m',
+                                       'adop-3.5m', 'sig940-300', '940-300', 'sig769-300', '769-300'], \
+                                       'Input string/number is not a valid gage name/number'
+
+        if str(gaugenumber).lower() in ['2', 'awac-11m']:
             # gname = 'AWAC04 - 11m'
             self.dataloc = 'oceanography/currents/awac-11m/awac-11m.ncml'
-        elif gaugenumber in [3, 'awac-8m']:
+        elif str(gaugenumber).lower() in ['3', 'awac-8m']:
             # gname = 'AWAC 8m'
             self.dataloc = 'oceanography/currents/awac-8m/awac-8m.ncml'
-        elif gaugenumber in [4, 'awac-6m']:
+        elif str(gaugenumber).lower() in ['4', 'awac-6m']:
             # gname = 'AWAC 6m'
             self.dataloc = 'oceanography/currents/awac-6m/awac-6m.ncml'
-        elif gaugenumber in [5, 'awac-4.5m']:
+        elif str(gaugenumber).lower() in ['5', 'awac-4.5m']:
             # gname = 'AWAC 4.5m'
             self.dataloc = 'oceanography/currents/awac-4.5m/awac-4.5m.ncml'
-        elif gaugenumber in [6, 'adop-3.5m']:
+        elif str(gaugenumber).lower() in ['6', 'adop-3.5m']:
             # gname = 'Aquadopp 3.5m'
             self.dataloc = 'oceanography/currents/adop-3.5m/adop-3.5m.ncml'
+        elif str(gaugenumber).lower() in ['sig940-300', '940-300']:
+            # Signature at yFRF 940, xFRF 300
+            self.dataloc = 'oceanography/currents/sig940-300/sig940-300.ncml'
+        elif str(gaugenumber).lower() in ['sig769-300', '769-300']:
+            # Signature at yFRF 769, xFRF 300
+            self.dataloc = 'oceanography/currents/sig769-300/sig769-300.ncml'
         else:
             raise NameError('Check gauge name')
         
