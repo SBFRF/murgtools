@@ -10,7 +10,7 @@ import tempfile
 import matplotlib.pyplot as plt
 import numpy as np
 
-from murgtools.getdata import getObs, getSatelliteImagery, getArgusImagery, get_geotiff_extent
+from murgtools.getdata import getObs, getSatelliteImagery, findArgusImagery, get_geotiff_extent
 from murgtools.utils import geoprocess as gp
 
 
@@ -95,7 +95,7 @@ def main():
     else:
         print("  No satellite imagery available")
 
-    # Get Argus imagery (finds closest 30-min interval to current time)
+    # Get Argus imagery (searches for nearest available within 24-hour window)
     print("\nFetching Argus imagery...")
     argus_result = None
     argus_extent = None
@@ -105,10 +105,17 @@ def main():
         tmp_path = tmp.name
 
     try:
-        argus_result = getArgusImagery(now, filename=tmp_path, imageType='brightest')
+        # Use findArgusImagery with method=1 (nearest in history) to get most recent image
+        # Using 'bright' (brightest pixels composite) for best visualization
+        argus_result = findArgusImagery(now, filename=tmp_path, imageType='bright',
+                                        search_window_hours=48, method=1)
         if argus_result:
             print(f"  Got Argus image from {argus_result['time'].strftime('%Y-%m-%d %H:%M')}")
             print(f"  Shape: {argus_result['image'].shape}")
+            # Show time offset if search was needed
+            offset_mins = argus_result.get('time_offset_minutes', 0)
+            if offset_mins != 0:
+                print(f"  Time offset from requested: {offset_mins} minutes ({offset_mins/60:.1f} hours)")
             # Extract extent from the GeoTIFF (in State Plane coordinates)
             sp_extent = get_geotiff_extent(tmp_path)
             print(f"  State Plane extent: {sp_extent}")
@@ -186,7 +193,11 @@ def main():
     if sat_result:
         title_parts.append(f'Satellite: {sat_result["time"].strftime("%Y-%m-%d")}')
     if argus_result:
-        title_parts.append(f'Argus overlay (50% opacity): {argus_result["time"].strftime("%Y-%m-%d %H:%M")}')
+        argus_title = f'Argus overlay (50% opacity): {argus_result["time"].strftime("%Y-%m-%d %H:%M")}'
+        offset_mins = argus_result.get('time_offset_minutes', 0)
+        if offset_mins != 0:
+            argus_title += f' (offset: {offset_mins/60:.1f}h)'
+        title_parts.append(argus_title)
     ax2.set_title('\n'.join(title_parts))
 
     # Set extent to satellite extent or compute from gauge locations
