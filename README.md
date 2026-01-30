@@ -1,10 +1,10 @@
 # murgtools
 
-A Python library for retrieving data from the USACE Field Research Facility (FRF) Coastal Model Test Bed (CMTB).
+A Python library for retrieving data from the USACE Field Research Facility (FRF) and supporting general tools, plotting routines, and generically useful stuff for the MURG.  Its comprised and was built from prior (no longer supported libraries) as `getdatatestbed` and `testbedutils`. Efforts have been made to streamline and make those prior libraries more generic and easier to use.
 
 ## Overview
 
-`murgtools` provides utilities for accessing observational and model data from the CHL public THREDDS server and local FRF server. It interfaces with NetCDF data files containing coastal oceanographic and meteorological measurements.
+`murgtools` provides utilities for accessing observational data from the CHL public THREDDS server and local FRF server. It interfaces with NetCDF data files containing coastal oceanographic and meteorological measurements.  It also has generically useful utilities to help with data transforms, file handling, easy evaluation and plotting routines.
 
 ## Installation
 
@@ -123,8 +123,6 @@ BSD-3-Clause License. See [LICENSE](LICENSE) for details.
 ## Author
 
 Spicer Bak, PhD
-USACE CHL Field Research Facility
-spicer.bak@usace.army.mil
 
 ## Contributing
 
