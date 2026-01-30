@@ -1,5 +1,7 @@
 # murgtools
 
+THIS REPO IS NOT QUITE CONSIDERED STABLE - Function calls may change 
+
 A Python library for retrieving data from the USACE Field Research Facility (FRF) and supporting general tools, plotting routines, and generically useful stuff for the MURG.  Its comprised and was built from prior (no longer supported libraries) as `getdatatestbed` and `testbedutils`. Efforts have been made to streamline and make those prior libraries more generic and easier to use.
 
 ## Overview
