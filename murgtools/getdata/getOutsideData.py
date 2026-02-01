@@ -6,6 +6,8 @@ import os
 import numpy as np
 import sys
 
+from murgtools import config
+
 class forecastData:
     """A data retrival class situated around gathering forecast data."""
     def __init__(self, d1):
@@ -22,12 +24,12 @@ class forecastData:
         self.rawdataloc_wave = []
         self.outputdir = []  # location for outputfiles
         self.d1 = d1  # start date for data grab
-        self.timeunits = 'seconds since 1970-01-01 00:00:00'
+        self.timeunits = config.TIME_UNITS
         self.epochd1 = nc.date2num(self.d1, self.timeunits)
-        self.dataLocFRF = 'http://134.164.129.55/thredds/dodsC/FRF/'
-        self.dataLocTB = 'http://134.164.129.62:8080/thredds/dodsC/CMTB'
-        self.dataLocCHL = 'https://chlthredds.erdc.dren.mil/thredds/dodsC/frf/' #'http://10.200.23.50/thredds/dodsC/frf/'
-        self.dataLocNCEP = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/wave/prod/'#ftpprd.ncep.noaa.gov/pub/data/nccf/com/wave/prod/multi_1.'
+        self.dataLocFRF = config.THREDDS_FRF_LOCAL_FRF
+        self.dataLocTB = config.THREDDS_TESTBED
+        self.dataLocCHL = config.THREDDS_CHL_ALT
+        self.dataLocNCEP = config.NCEP_DATA_URL
         self.dataLocECWMF = 'ftp://data-portal.ecmwf.int/20170808120000/'  # ECMWF forecasts
         assert type(self.d1) == DT.datetime, 'end need to be in python "Datetime" data types'
 
@@ -312,15 +314,10 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
     rotation_angle = np.degrees(np.arctan2(dy, dx))
 
     # 3. Build STAC search query based on endpoint
-    endpoints = {
-        'element84': 'https://earth-search.aws.element84.com/v1/search',
-        'planetary-computer': 'https://planetarycomputer.microsoft.com/api/stac/v1/search'
-    }
+    if endpoint not in config.STAC_URLS:
+        raise ValueError(f"Unknown endpoint '{endpoint}'. Options: {list(config.STAC_URLS.keys())}")
 
-    if endpoint not in endpoints:
-        raise ValueError(f"Unknown endpoint '{endpoint}'. Options: {list(endpoints.keys())}")
-
-    stac_url = endpoints[endpoint]
+    stac_url = config.STAC_URLS[endpoint]
 
     if date is None:
         date = DT.datetime.now()
@@ -378,7 +375,7 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
 
     # Sign URL if using Planetary Computer (required for asset access)
     if endpoint == 'planetary-computer':
-        sign_url = f"https://planetarycomputer.microsoft.com/api/sas/v1/sign?href={rgb_url}"
+        sign_url = f"{config.PLANETARY_COMPUTER_SIGN_URL}?href={rgb_url}"
         sign_resp = requests.get(sign_url)
         sign_resp.raise_for_status()
         rgb_url = sign_resp.json()['href']

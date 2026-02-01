@@ -19,6 +19,8 @@ import numpy as np
 import pandas as pd
 
 from murgtools.utils import geoprocess as gp, sblib as sb
+from murgtools import config
+from murgtools.exceptions import InvalidGaugeError, DataNotFoundError, InvalidParameterError
 
 def gettime(allEpoch, epochStart, epochEnd, indexRef=0):
     """This function opens the netcdf file, and retrieves time.
@@ -72,25 +74,11 @@ def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=60, cutrange=100000
     start = kwargs.get('start', None)
     end = kwargs.get('end', None)
     server = kwargs.get('server', None)
-    FRFdataloc = u'http://134.164.129.55:8080/thredds/dodsC/'
-    chlDataLoc = u'https://chldata.erdc.dren.mil/thredds/dodsC/'
     # a list of data sets (just the ncml) that shouldn't drill down to monthly file
     doNotDrillList = ['survey', 'integratedBathyTopo']
 
-    # chose which server to select based on IP
-    try:
-        ipAddress = socket.gethostbyname(socket.gethostname())
-        if (server == 'FRF' or server is None) and (ipAddress.startswith('134.164') or ipAddress.startswith('10.0.0')):  # FRF subdomain
-            THREDDSloc = FRFdataloc
-            pName = u'FRF'
-        elif server in ['CHL', 'chl', None]:
-            THREDDSloc = chlDataLoc
-            pName = u'frf'
-    except:
-        print('Could not aquire socket using CHLdata')
-
-        THREDDSloc = chlDataLoc
-        pName = u'frf'
+    # chose which server to select based on IP using centralized config
+    THREDDSloc, pName = config.get_thredds_server(server=server)
         
     if callingClass == 'getDataTestBed':  # overwrite pName if calling for model data
         pName = u'cmtb'
@@ -234,13 +222,13 @@ class getObs:
         #self.outputdir = []  # location for outputfiles
         self.d1 = d1  # start date for data grab
         self.d2 = d2  # end data for data grab
-        self.timeunits = 'seconds since 1970-01-01 00:00:00'
+        self.timeunits = config.TIME_UNITS
         self.epochd1 = nc.date2num(self.d1, self.timeunits)
         self.epochd2 = nc.date2num(self.d2, self.timeunits)
         self.callingClass = 'getObs'
-        self.FRFdataloc = 'http://134.164.129.55/thredds/dodsC/FRF/'
-        self.crunchDataLoc = 'http://134.164.129.55/thredds/dodsC/cmtb/'
-        self.chlDataLoc = 'https://chlthredds.erdc.dren.mil/thredds/dodsC/frf/'  #
+        self.FRFdataloc = config.THREDDS_FRF_LOCAL_FRF
+        self.crunchDataLoc = config.THREDDS_CRUNCH
+        self.chlDataLoc = config.THREDDS_CHL_ALT
         self.server = kwargs.get('server', None)
         self._comp_time()
         # assert type(self.d2) == DT.datetime, 'd1 need to be in python "Datetime" data types'
@@ -549,7 +537,8 @@ class getObs:
             # gname = 'Aquadopp 3.5m'
             self.dataloc = 'oceanography/currents/adop-3.5m/adop-3.5m.ncml'
         else:
-            raise NameError('Check gauge name')
+            valid_gauges = [2, 3, 4, 5, 6, 'awac-11m', 'awac-8m', 'awac-6m', 'awac-4.5m', 'adop-3.5m']
+            raise InvalidGaugeError(gaugenumber, valid_gauges=valid_gauges)
         
         self.ncfile, self.allEpoch, _= getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=roundto * 60)  # start=self.d1, end=self.d2) <
@@ -667,7 +656,8 @@ class getObs:
             gname = '732 wind gauge'
             self.dataloc = 'meteorology/wind/D732/D732.ncml'
         else:
-            raise NameError('Specifiy proper Gauge number')
+            valid_gauges = [0, 1, 2, 3, 'derived', 'Derived']
+            raise InvalidGaugeError(gaugenumber, valid_gauges=valid_gauges)
         
         self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=collectionlength * 60, start=self.d1, end=self.d2,
@@ -1372,8 +1362,8 @@ class getObs:
 
         else:
             self.gname = 'There Are no Gauge numbers here'
-            raise NameError('Bad Gauge name, specify proper gauge name/number, or add capability')
-    
+            raise InvalidGaugeError(gaugenumber, message='Bad gauge name. See getWaveGaugeLoc for valid options.')
+
     def _wlGageURLlookup(self, gaugenumber):
         """A lookup table function that sets the URL backend for getGageWL.
         
@@ -1430,7 +1420,7 @@ class getObs:
             self.dataloc = 'oceanography/waves/8m-array/8m-array.ncml'
         else:
             self.gname = 'There Are no Gauge numbers here'
-            raise NameError('Bad Gauge name, specify proper gauge name/number')
+            raise InvalidGaugeError(gaugenumber, message='Bad gauge name. See _wlGageURLlookup for valid options.')
     
     def getBathyDuckLoc(self, gaugenumber):
         """This function pulls the stateplane location (if desired) from the survey.
@@ -2420,22 +2410,15 @@ class getDataTestBed:
         self.outputdir = []  # location for outputfiles
         self.start = d1  # start date for data grab
         self.end = d2  # end data for data grab
-        self.timeunits = 'seconds since 1970-01-01 00:00:00'
+        self.timeunits = config.TIME_UNITS
         self.epochd1 = nc.date2num(self.start, self.timeunits)
         self.epochd2 = nc.date2num(self.end, self.timeunits)
         self.comp_time()
-        # if THREDDS is None:
-        #     ipAddress = socket.gethostbyname(socket.gethostname())
-        #     if ipAddress.startswith('134.164.129'):  # FRF subdomain
-        #         self.THREDDS = 'FRF'
-        #     else:
-        #         self.THREDDS = 'CHL'
-        #
         self.server = kwargs.get('server', None)
         self.callingClass = 'getDataTestBed'
-        self.FRFdataloc = u'http://134.164.129.55:8080/thredds/dodsC/FRF/'
-        self.crunchDataLoc = u'http://134.164.129.55:8080/thredds/dodsC/cmtb/'
-        self.chlDataLoc = u'https://chlthredds.erdc.dren.mil/thredds/dodsC/frf/'
+        self.FRFdataloc = config.THREDDS_FRF_LOCAL + 'FRF/'
+        self.crunchDataLoc = config.THREDDS_CRUNCH
+        self.chlDataLoc = config.THREDDS_CHL_ALT
         
         assert type(self.end) == DT.datetime, 'end dates need to be in python "Datetime" data types'
         assert type(
@@ -3197,7 +3180,7 @@ class getDataTestBed:
             fname = 'xp100m/xp100m.ncml'
         else:
             gname = 'There Are no Gauge numbers here'
-            raise NameError('Bad Gauge name, specify proper gauge name/number')
+            raise InvalidGaugeError(gaugenumber, message='Bad gauge name. See _wlGageURLlookup for valid options.')
         # parsing out data of interest in time
 
         self.dataloc = urlFront + '/' + fname
@@ -3399,33 +3382,22 @@ def getArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=Tr
         logging.basicConfig(level=logging.INFO)
 
     # Validate imageType
-    valid_types = ['timex', 'var', 'snap', 'bright', 'dark']
-    if imageType.lower() not in valid_types:
-        raise ValueError(f"Invalid imageType '{imageType}'. Must be one of: {valid_types}")
+    if imageType.lower() not in config.ARGUS_IMAGE_TYPES:
+        raise ValueError(f"Invalid imageType '{imageType}'. Must be one of: {config.ARGUS_IMAGE_TYPES}")
 
-    # Round to nearest 30 minutes
-    minutes = dateOfInterest.minute
-    if minutes < 15:
-        rounded_minutes = 0
-    elif minutes < 45:
-        rounded_minutes = 30
-    else:
-        rounded_minutes = 0
-        dateOfInterest = dateOfInterest + DT.timedelta(hours=1)
-
-    roundedTime = dateOfInterest.replace(minute=rounded_minutes, second=0, microsecond=0)
+    # Round to nearest 30 minutes using centralized utility
+    roundedTime = sb.roundDatetimeToInterval(dateOfInterest, config.ARGUS_IMAGE_INTERVAL_MINUTES)
 
     # Construct URL
-    baseURL = "https://coastalimaging.erdc.dren.mil/FrfTower/Processed/Orthophotos/cxgeo/"
     fldr = roundedTime.strftime("%Y_%m_%d")
     fname = f'{roundedTime.strftime("%Y%m%dT%H%M%SZ")}.FrfTower.cxgeo.{imageType}.tif'
-    url = urljoin(baseURL, fldr, fname)
+    url = urljoin(config.ARGUS_BASE_URL, fldr, fname)
 
     logging.info(f"Retrieving Argus imagery from {url}")
 
     # Download the image
     try:
-        resp = requests.get(url, stream=True, timeout=60)
+        resp = requests.get(url, stream=True, timeout=config.DEFAULT_TIMEOUT_SECONDS)
         resp.raise_for_status()
     except requests.exceptions.RequestException as e:
         logging.warning(f"Failed to retrieve Argus imagery: {e}")
@@ -3548,18 +3520,8 @@ def findArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=T
     if verbose:
         logging.basicConfig(level=logging.INFO)
 
-    # Round to nearest 30 minutes (same logic as getArgusImagery)
-    minutes = dateOfInterest.minute
-    if minutes < 15:
-        rounded_minutes = 0
-        rounded_time = dateOfInterest
-    elif minutes < 45:
-        rounded_minutes = 30
-        rounded_time = dateOfInterest
-    else:
-        rounded_minutes = 0
-        rounded_time = dateOfInterest + DT.timedelta(hours=1)
-    time_requested = rounded_time.replace(minute=rounded_minutes, second=0, microsecond=0)
+    # Round to nearest 30 minutes using centralized utility
+    time_requested = sb.roundDatetimeToInterval(dateOfInterest, config.ARGUS_IMAGE_INTERVAL_MINUTES)
 
     # Calculate max number of 30-min slots to search
     max_slots = int(search_window_hours * 2)
