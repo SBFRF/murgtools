@@ -198,7 +198,6 @@ class TestGetDataTestBedIntegration:
 class TestNetworkConnectivity:
     """Tests that verify network connectivity (marked slow, skipped in CI)."""
 
-    @pytest.mark.skip(reason="Requires network access to THREDDS server")
     def test_can_reach_chl_thredds(self):
         """Test that CHL THREDDS server is reachable."""
         import urllib.request

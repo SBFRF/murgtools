@@ -683,7 +683,7 @@ class TestGetObsGetCurrents:
 
     @patch('murgtools.getdata.getDataFRF.nc.date2num')
     def test_getCurrents_invalid_gauge_raises(self, mock_date2num):
-        """Test that getCurrents raises AssertionError for invalid gauge."""
+        """Test that getCurrents raises InvalidGaugeError for invalid gauge."""
         mock_date2num.return_value = 1577836800.0
         d1 = DT.datetime(2020, 1, 1)
         d2 = DT.datetime(2020, 1, 2)
@@ -691,7 +691,7 @@ class TestGetObsGetCurrents:
         from murgtools.getdata.getDataFRF import getObs
         obs = getObs(d1, d2)
 
-        with pytest.raises(AssertionError):
+        with pytest.raises(InvalidGaugeError):
             obs.getCurrents(gaugenumber='invalid-gauge')
 
 
@@ -731,3 +731,152 @@ class TestGetObsGetWaveSpec:
             mock_wave.assert_called_once()
             call_kwargs = mock_wave.call_args[1]
             assert call_kwargs.get('spec') is True
+
+
+class TestNewGaugeURLLookups:
+    """Tests for newly added gauge URL lookups (sig940-*, awac-jpier, waverider-20m, etc.)."""
+
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
+    def test_wave_gauge_lookup_signature_profilers(self, mock_date2num):
+        """Test that signature profiler wave gauges are recognized."""
+        mock_date2num.return_value = 1577836800.0
+        d1 = DT.datetime(2020, 1, 1)
+        d2 = DT.datetime(2020, 1, 2)
+
+        from murgtools.getdata.getDataFRF import getObs
+        obs = getObs(d1, d2)
+
+        # Test new signature profiler gauges
+        sig_gauges = [
+            ('sig940-400', 'oceanography/waves/sig940-400/sig940-400.ncml'),
+            ('940-400', 'oceanography/waves/sig940-400/sig940-400.ncml'),
+            ('sig940-600', 'oceanography/waves/sig940-600/sig940-600.ncml'),
+            ('940-600', 'oceanography/waves/sig940-600/sig940-600.ncml'),
+        ]
+
+        for gauge_name, expected_url in sig_gauges:
+            obs._waveGaugeURLlookup(gauge_name)
+            assert obs.dataloc == expected_url, f"Failed for gauge: {gauge_name}"
+
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
+    def test_wave_gauge_lookup_awac_jpier(self, mock_date2num):
+        """Test that AWAC jetty pier gauge is recognized."""
+        mock_date2num.return_value = 1577836800.0
+        d1 = DT.datetime(2020, 1, 1)
+        d2 = DT.datetime(2020, 1, 2)
+
+        from murgtools.getdata.getDataFRF import getObs
+        obs = getObs(d1, d2)
+
+        jpier_gauges = [
+            ('awac-jpier-11m', 'oceanography/waves/awac-jpier-11m/awac-jpier-11m.ncml'),
+            ('awac-jpier', 'oceanography/waves/awac-jpier-11m/awac-jpier-11m.ncml'),
+            ('jpier-11m', 'oceanography/waves/awac-jpier-11m/awac-jpier-11m.ncml'),
+        ]
+
+        for gauge_name, expected_url in jpier_gauges:
+            obs._waveGaugeURLlookup(gauge_name)
+            assert obs.dataloc == expected_url, f"Failed for gauge: {gauge_name}"
+
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
+    def test_wave_gauge_lookup_new_waveriders(self, mock_date2num):
+        """Test that new waverider gauges are recognized."""
+        mock_date2num.return_value = 1577836800.0
+        d1 = DT.datetime(2020, 1, 1)
+        d2 = DT.datetime(2020, 1, 2)
+
+        from murgtools.getdata.getDataFRF import getObs
+        obs = getObs(d1, d2)
+
+        waverider_gauges = [
+            ('waverider-17m-1d', 'oceanography/waves/waverider-17m-1D/waverider-17m-1D.ncml'),
+            ('17m-1d', 'oceanography/waves/waverider-17m-1D/waverider-17m-1D.ncml'),
+            ('waverider-20m', 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'),
+            ('waverider-20m-1d', 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'),
+            ('20m', 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'),
+        ]
+
+        for gauge_name, expected_url in waverider_gauges:
+            obs._waveGaugeURLlookup(gauge_name)
+            assert obs.dataloc == expected_url, f"Failed for gauge: {gauge_name}"
+
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
+    def test_wave_gauge_lookup_paros_aliases(self, mock_date2num):
+        """Test that both paros naming conventions work."""
+        mock_date2num.return_value = 1577836800.0
+        d1 = DT.datetime(2020, 1, 1)
+        d2 = DT.datetime(2020, 1, 2)
+
+        from murgtools.getdata.getDataFRF import getObs
+        obs = getObs(d1, d2)
+
+        paros_gauges = [
+            ('paros-200-940m', 'oceanography/waves/paros940-200/paros940-200.ncml'),
+            ('paros940-200', 'oceanography/waves/paros940-200/paros940-200.ncml'),
+            ('paros-250-940m', 'oceanography/waves/paros940-250/paros940-250.ncml'),
+            ('paros940-250', 'oceanography/waves/paros940-250/paros940-250.ncml'),
+        ]
+
+        for gauge_name, expected_url in paros_gauges:
+            obs._waveGaugeURLlookup(gauge_name)
+            assert obs.dataloc == expected_url, f"Failed for gauge: {gauge_name}"
+
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
+    def test_currents_gauge_lookup_signature_profilers(self, mock_date2num):
+        """Test that signature profiler current meters are recognized."""
+        mock_date2num.return_value = 1577836800.0
+        d1 = DT.datetime(2020, 1, 1)
+        d2 = DT.datetime(2020, 1, 2)
+
+        from murgtools.getdata.getDataFRF import getObs
+        obs = getObs(d1, d2)
+
+        # Verify signature profilers are in the valid gauge list for currents
+        sig_gauges = ['sig769-300', 'sig940-300', 'sig940-400', 'sig940-600']
+        for gauge in sig_gauges:
+            assert gauge in obs.currentsGaugeList, f"{gauge} should be in currentsGaugeList"
+
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
+    def test_currents_gauge_lookup_awac_jpier(self, mock_date2num):
+        """Test that AWAC jetty pier current gauge is recognized."""
+        mock_date2num.return_value = 1577836800.0
+        d1 = DT.datetime(2020, 1, 1)
+        d2 = DT.datetime(2020, 1, 2)
+
+        from murgtools.getdata.getDataFRF import getObs
+        obs = getObs(d1, d2)
+
+        assert 'awac-jpier-11m' in obs.currentsGaugeList
+
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
+    def test_wave_gauge_list_contains_new_gauges(self, mock_date2num):
+        """Test that waveGaugeList includes newly added gauges."""
+        mock_date2num.return_value = 1577836800.0
+        d1 = DT.datetime(2020, 1, 1)
+        d2 = DT.datetime(2020, 1, 2)
+
+        from murgtools.getdata.getDataFRF import getObs
+        obs = getObs(d1, d2)
+
+        new_wave_gauges = [
+            'waverider-20m-1d', 'awac-jpier-11m',
+            'sig940-300', 'sig769-300', 'sig940-400', 'sig940-600'
+        ]
+        for gauge in new_wave_gauges:
+            assert gauge in obs.waveGaugeList, f"{gauge} should be in waveGaugeList"
+
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
+    def test_directional_wave_gauge_list_contains_new_gauges(self, mock_date2num):
+        """Test that directionalWaveGaugeList includes newly added directional gauges."""
+        mock_date2num.return_value = 1577836800.0
+        d1 = DT.datetime(2020, 1, 1)
+        d2 = DT.datetime(2020, 1, 2)
+
+        from murgtools.getdata.getDataFRF import getObs
+        obs = getObs(d1, d2)
+
+        # Waveriders and AWACs provide directional data
+        directional_gauges = ['waverider-20m-1d', 'awac-jpier-11m']
+        for gauge in directional_gauges:
+            assert gauge in obs.directionalWaveGaugeList, \
+                f"{gauge} should be in directionalWaveGaugeList"

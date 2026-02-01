@@ -211,13 +211,17 @@ class getObs:
     def __init__(self, d1, d2, **kwargs):
         """Data are returned in self.dataindex are inclusive at start, exclusive at end."""
         # this is active wave gauge list for looping through as needed
-        self.waveGaugeList = ['waverider-26m', 'waverider-17m', 'awac-11m', '8m-array',
-                              'awac-6m', 'awac-4.5m', 'adop-3.5m', 'xp200m', 'xp150m', 'xp125m']
-        
-        self.directionalWaveGaugeList = ['waverider-26m', 'waverider-17m', 'awac-11m', '8m-array',
+        self.waveGaugeList = ['waverider-26m', 'waverider-17m', 'waverider-20m-1d', 'awac-11m',
+                              'awac-jpier-11m', '8m-array', 'awac-6m', 'awac-4.5m', 'adop-3.5m',
+                              'xp200m', 'xp150m', 'xp125m', 'sig940-300', 'sig769-300',
+                              'sig940-400', 'sig940-600']
+
+        self.directionalWaveGaugeList = ['waverider-26m', 'waverider-17m', 'waverider-20m-1d',
+                                         'awac-11m', 'awac-jpier-11m', '8m-array',
                                          'awac-6m', 'awac-4.5m', 'adop-3.5m']
-        
-        self.currentsGaugeList = ['awac-11m', 'awac-6m', 'awac-4.5m', 'adop-3.5m']
+
+        self.currentsGaugeList = ['awac-11m', 'awac-jpier-11m', 'awac-6m', 'awac-4.5m', 'adop-3.5m',
+                                  'sig769-300', 'sig940-300', 'sig940-400', 'sig940-600']
         #self.rawdataloc_wave = []
         #self.outputdir = []  # location for outputfiles
         self.d1 = d1  # start date for data grab
@@ -517,27 +521,38 @@ class getObs:
                 'meanP' (array): mean pressure
 
         """
-        assert gaugenumber.lower() in [2, 3, 4, 5, 6, 'awac-11m', 'awac-8m', 'awac-6m', 'awac-4.5m',
-                                       'adop-3.5m'], 'Input string/number is not a valid gage ' \
-                                                     'name/number'
-        
+        valid_gauges = [2, 3, 4, 5, 6, 'awac-11m', 'awac-8m', 'awac-6m', 'awac-4.5m', 'awac-5m',
+                        'adop-3.5m', 'awac-jpier-11m', 'awac-jpier', 'jpier-11m',
+                        'sig769-300', 'sig940-300', 'sig940-400', 'sig940-600']
+        gauge_lower = str(gaugenumber).lower()
+        if gauge_lower not in valid_gauges and gaugenumber not in valid_gauges:
+            raise InvalidGaugeError(gaugenumber, valid_gauges=valid_gauges)
+
         if gaugenumber in [2, 'awac-11m']:
-            # gname = 'AWAC04 - 11m'
             self.dataloc = 'oceanography/currents/awac-11m/awac-11m.ncml'
         elif gaugenumber in [3, 'awac-8m']:
-            # gname = 'AWAC 8m'
             self.dataloc = 'oceanography/currents/awac-8m/awac-8m.ncml'
         elif gaugenumber in [4, 'awac-6m']:
-            # gname = 'AWAC 6m'
             self.dataloc = 'oceanography/currents/awac-6m/awac-6m.ncml'
         elif gaugenumber in [5, 'awac-4.5m']:
-            # gname = 'AWAC 4.5m'
             self.dataloc = 'oceanography/currents/awac-4.5m/awac-4.5m.ncml'
+        elif gauge_lower == 'awac-5m':
+            self.dataloc = 'oceanography/currents/awac-5m/awac-5m.ncml'
         elif gaugenumber in [6, 'adop-3.5m']:
-            # gname = 'Aquadopp 3.5m'
             self.dataloc = 'oceanography/currents/adop-3.5m/adop-3.5m.ncml'
+        # AWAC at jetty pier
+        elif gauge_lower in ['awac-jpier-11m', 'awac-jpier', 'jpier-11m']:
+            self.dataloc = 'oceanography/currents/awac-jpier-11m/awac-jpier-11m.ncml'
+        # Nortek Signature profilers
+        elif gauge_lower in ['sig769-300', '769-300']:
+            self.dataloc = 'oceanography/currents/sig769-300/sig769-300.ncml'
+        elif gauge_lower in ['sig940-300', '940-300']:
+            self.dataloc = 'oceanography/currents/sig940-300/sig940-300.ncml'
+        elif gauge_lower in ['sig940-400', '940-400']:
+            self.dataloc = 'oceanography/currents/sig940-400/sig940-400.ncml'
+        elif gauge_lower in ['sig940-600', '940-600']:
+            self.dataloc = 'oceanography/currents/sig940-600/sig940-600.ncml'
         else:
-            valid_gauges = [2, 3, 4, 5, 6, 'awac-11m', 'awac-8m', 'awac-6m', 'awac-4.5m', 'adop-3.5m']
             raise InvalidGaugeError(gaugenumber, valid_gauges=valid_gauges)
         
         self.ncfile, self.allEpoch, _= getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
@@ -1320,10 +1335,23 @@ class getObs:
             self.dataloc = 'oceanography/waves/sig940-300/sig940-300.ncml'
         elif str(gaugenumber).lower() in ['sig769-300', '769-300']:
             self.dataloc = 'oceanography/waves/sig769-300/sig769-300.ncml'
-        elif str(gaugenumber).lower() in ['paros-200-940m']:
-            self.dataloc = 'oceanography/waves/paros-200-940m/paros-200-940m.ncml'
-        elif str(gaugenumber).lower() in ['paros-250-940m']:
-            self.dataloc = 'oceanography/waves/paros-250-940m/paros-250-940m.ncml'
+        elif str(gaugenumber).lower() in ['sig940-400', '940-400']:
+            self.dataloc = 'oceanography/waves/sig940-400/sig940-400.ncml'
+        elif str(gaugenumber).lower() in ['sig940-600', '940-600']:
+            self.dataloc = 'oceanography/waves/sig940-600/sig940-600.ncml'
+        # AWAC at jetty pier
+        elif str(gaugenumber).lower() in ['awac-jpier-11m', 'awac-jpier', 'jpier-11m']:
+            self.dataloc = 'oceanography/waves/awac-jpier-11m/awac-jpier-11m.ncml'
+        # New waveriders
+        elif str(gaugenumber).lower() in ['waverider-17m-1d', '17m-1d']:
+            self.dataloc = 'oceanography/waves/waverider-17m-1D/waverider-17m-1D.ncml'
+        elif str(gaugenumber).lower() in ['waverider-20m', 'waverider-20m-1d', '20m', '20m-1d']:
+            self.dataloc = 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'
+        # Paros pressure sensors - support both naming conventions
+        elif str(gaugenumber).lower() in ['paros-200-940m', 'paros940-200']:
+            self.dataloc = 'oceanography/waves/paros940-200/paros940-200.ncml'
+        elif str(gaugenumber).lower() in ['paros-250-940m', 'paros940-250']:
+            self.dataloc = 'oceanography/waves/paros940-250/paros940-250.ncml'
         elif str(gaugenumber).lower() in ['paros-340x-940y-top']:
             self.dataloc = 'oceanography/waves/paros-340x-940y-top/paros-340x-940y-top.ncml'
         # lidar wave gauges - 140 m
