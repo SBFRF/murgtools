@@ -390,6 +390,46 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
 
     try:
         image = tifffile.imread(tmp_path)
+
+        # Extract actual image extent from GeoTIFF tags and convert to lat/lon
+        # STAC bbox is not reliable for pixel coordinate calculation
+        with tifffile.TiffFile(tmp_path) as tif:
+            tags = tif.pages[0].tags
+            tiepoint = tags[33922].value  # (i, j, k, x, y, z) - UTM coordinates
+            scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
+            img_h, img_w = tif.pages[0].shape[:2]
+
+            # UTM bounds
+            utm_left = tiepoint[3]
+            utm_right = tiepoint[3] + img_w * scale[0]
+            utm_top = tiepoint[4]
+            utm_bottom = tiepoint[4] - img_h * scale[1]
+
+            # Determine UTM zone from GeoKey (tag 34737 contains projection info)
+            proj_str = tags.get(34737, None)
+            if proj_str:
+                proj_str = proj_str.value
+                # Parse UTM zone from string like "WGS 84 / UTM zone 18N"
+                import re
+                match = re.search(r'UTM zone (\d+)([NS])', str(proj_str))
+                if match:
+                    zone = int(match.group(1))
+                    hemisphere = match.group(2)
+                    epsg = 32600 + zone if hemisphere == 'N' else 32700 + zone
+                else:
+                    epsg = 32618  # Default to zone 18N for FRF area
+            else:
+                epsg = 32618
+
+            # Convert UTM corners to lat/lon
+            from pyproj import Transformer
+            transformer = Transformer.from_crs(f'EPSG:{epsg}', 'EPSG:4326', always_xy=True)
+
+            tl_lon, tl_lat = transformer.transform(utm_left, utm_top)
+            br_lon, br_lat = transformer.transform(utm_right, utm_bottom)
+
+            # scene_bbox in lat/lon: [west, south, east, north]
+            scene_bbox = [tl_lon, br_lat, br_lon, tl_lat]
     finally:
         os.unlink(tmp_path)
 
@@ -397,9 +437,7 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
     if collection == 'naip' and image.ndim == 3 and image.shape[-1] == 4:
         image = image[:, :, :3]  # Keep only RGB, drop NIR
 
-    # 7. Crop to bbox
-    scene_bbox = item['bbox']  # [west, south, east, north]
-
+    # 7. Crop to bbox using actual image extent from GeoTIFF
     h, w = image.shape[:2]
     px_per_deg_x = w / (scene_bbox[2] - scene_bbox[0])
     px_per_deg_y = h / (scene_bbox[3] - scene_bbox[1])

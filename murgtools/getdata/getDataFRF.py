@@ -140,8 +140,9 @@ def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=60, cutrange=100000
                     indexRef = [idts[res1], idts[res2]]  # define a refined time window to return
                     allEpoch = ncFile['time'][idts[res1]:idts[res2]]
                 else:  # there is no relevant data in my window, take the last "cutrange" of values
-                    indexRef = [-cutrange, len(tt)]
-                    allEpoch = ncFile['time'][-cutrange: len(tt)]
+                    startIdx = max(0, len(tt) - cutrange)  # compute actual positive offset
+                    indexRef = [startIdx, len(tt)]
+                    allEpoch = ncFile['time'][startIdx:]
             finished = True
         except IOError:
             print('Error reading {}, trying again {}/{}'.format(ncfileURL, n + 1, maxTries))
@@ -312,13 +313,17 @@ class getObs:
         # Making gauges flexible
         self._waveGaugeURLlookup(gaugenumber)
         # parsing out data of interest in time
-        self.ncfile, self.allEpoch, _ = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
+        self.ncfile, self.allEpoch, indexRef = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=roundto * 60, epoch1=self.epochd1, epoch2=self.epochd2,
                                            start=self.d1, end=self.d2, server=self.server)
         try:
             self.wavedataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
                                          epochEnd=self.epochd2)
-            assert np.array(self.wavedataindex).all() is not None, 'there''s no data in your time period'
+            if self.wavedataindex is None:
+                raise ValueError('there is no data in your time period')
+            # Compute absolute index for netCDF file access when getnc() returned a subset
+            indexOffset = indexRef[0] if indexRef is not None else 0
+            self.ncfileindex = self.wavedataindex + indexOffset  # absolute index for ncfile access
 
             if np.size(self.wavedataindex) >= 1:
                 # consistant for all wave gauges
@@ -353,12 +358,12 @@ class getObs:
                             'lat':         self.ncfile['latitude'][:],
                             'lon':         self.ncfile['longitude'][:],
                             'depth':       depth,
-                            'Hs':          self.ncfile['waveHs'][self.wavedataindex],
+                            'Hs':          self.ncfile['waveHs'][self.ncfileindex],
                 }
                 if 'waveTp' in self.ncfile.variables.keys():
-                    wavespec['peakf'] = 1 / self.ncfile['waveTp'][self.wavedataindex]
+                    wavespec['peakf'] = 1 / self.ncfile['waveTp'][self.ncfileindex]
                 elif 'peakf' in self.ncfile.variables.keys():
-                    wavespec['peakf'] = self.ncfile['waveTp'][self.wavedataindex]
+                    wavespec['peakf'] = self.ncfile['waveTp'][self.ncfileindex]
                 else:
                     pass
     
@@ -368,11 +373,11 @@ class getObs:
                 try:  # pull time specific data based on self.wavedataindex
                     wavespec['depth'] = self.ncfile['nominalDepth'][:]  # this should always go with directional gauges
                     wavespec['wavedirbin'] = self.ncfile['waveDirectionBins'][:]
-                    wavespec['qcFlagE'] = self.ncfile['qcFlagE'][self.wavedataindex]
-                    wavespec['qcFlagD'] = self.ncfile['qcFlagD'][self.wavedataindex]
+                    wavespec['qcFlagE'] = self.ncfile['qcFlagE'][self.ncfileindex]
+                    wavespec['qcFlagD'] = self.ncfile['qcFlagD'][self.ncfileindex]
                     if spec is True:
-                        wavespec['dWED'] = self.ncfile['directionalWaveEnergyDensity'][self.wavedataindex, :, :]
-                        wavespec['fspec'] = self.ncfile['waveEnergyDensity'][self.wavedataindex, :]
+                        wavespec['dWED'] = self.ncfile['directionalWaveEnergyDensity'][self.ncfileindex, :, :]
+                        wavespec['fspec'] = self.ncfile['waveEnergyDensity'][self.ncfileindex, :]
                         # wavespec['units']['dWED'] = self.ncfile['directionalWaveEnergyDensity'].units
                         # wavespec['units']['fspec'] = self.ncfile['waveEnergyDensity'].units
 
@@ -382,9 +387,9 @@ class getObs:
                             # wavespec['units']['dWED'] = self.ncfile['directionalWaveEnergyDensity'].units
                             # wavespec['units']['fspec'] = self.ncfile['waveEnergyDensity'].units
                     try:
-                        wavespec['waveDp'] = self.ncfile['wavePeakDirectionPeakFrequency'][self.wavedataindex]
-                        wavespec['waveDm'] = self.ncfile['waveMeanDirection'][self.wavedataindex]
-                        wavespec['Tm'] = self.ncfile['waveTm'][self.wavedataindex]
+                        wavespec['waveDp'] = self.ncfile['wavePeakDirectionPeakFrequency'][self.ncfileindex]
+                        wavespec['waveDm'] = self.ncfile['waveMeanDirection'][self.ncfileindex]
+                        wavespec['Tm'] = self.ncfile['waveTm'][self.ncfileindex]
                         wavespec['units']['waveDp'] = self.ncfile['wavePeakDirectionPeakFrequency'].units
                         wavespec['units']['waveDm'] = self.ncfile['waveMeanDirection'].units
                         wavespec['units']['Tm'] = self.ncfile['waveTm'].units
@@ -392,10 +397,10 @@ class getObs:
                         pass
                         
                     if returnAB is True:
-                        wavespec['a1'] = self.ncfile['waveA1Value'][self.wavedataindex, :]
-                        wavespec['a2'] = self.ncfile['waveA2Value'][self.wavedataindex, :]
-                        wavespec['b1'] = self.ncfile['waveB1Value'][self.wavedataindex, :]
-                        wavespec['b2'] = self.ncfile['waveB2Value'][self.wavedataindex, :]
+                        wavespec['a1'] = self.ncfile['waveA1Value'][self.ncfileindex, :]
+                        wavespec['a2'] = self.ncfile['waveA2Value'][self.ncfileindex, :]
+                        wavespec['b1'] = self.ncfile['waveB1Value'][self.ncfileindex, :]
+                        wavespec['b2'] = self.ncfile['waveB2Value'][self.ncfileindex, :]
                 # this should throw when gauge is non directionalWaveGaugeList
                 except IndexError:  # if error its non-directional gauge
                     # lidar guages don't have this variable.
@@ -408,9 +413,9 @@ class getObs:
                     wavespec['wavedirbin'] = np.arange(0, 360, 90)  # 90 degree bins
                     wavespec['waveDp'] = np.ones_like(self.wavedataindex) * -999
                     try:
-                        wavespec['fspec'] = self.ncfile['waveEnergyDensity'][self.wavedataindex, :]
+                        wavespec['fspec'] = self.ncfile['waveEnergyDensity'][self.ncfileindex, :]
                     except(RuntimeError):  # handle n-1 index error with Thredds
-                        wavespec['fspec'] = self.ncfile['waveEnergyDensity'][self.wavedataindex[:-1], :]
+                        wavespec['fspec'] = self.ncfile['waveEnergyDensity'][self.ncfileindex[:-1], :]
                         wavespec['fspec'] = np.append(wavespec['fspec'],
                                                       self.ncfile['waveEnergyDensity'][
                                                       self.wavedataindex[-1], :][
@@ -424,10 +429,10 @@ class getObs:
                     wavespec['dWED'] = wavespec['dWED']*wavespec['fspec'][:, :, np.newaxis]/len(wavespec['wavedirbin'])
                     if 'qcFlagE' in self.ncfile.variables.keys():
                         # lidar wave gauges don't have this variable.
-                        wavespec['qcFlagE'] = self.ncfile['qcFlagE'][self.wavedataindex]
+                        wavespec['qcFlagE'] = self.ncfile['qcFlagE'][self.ncfileindex]
                     else:
                         # lidar wave gauges have waterLevelQCFlag and spectralQCFlag
-                        wavespec['qcFlagE'] = self.ncfile['waterLevelQCFlag'][self.wavedataindex]
+                        wavespec['qcFlagE'] = self.ncfile['waterLevelQCFlag'][self.ncfileindex]
                 if removeBadDataFlag is not False:
                     # Energy should not be needed
                     try:
@@ -3228,14 +3233,14 @@ class getDataTestBed:
                             'wavefreqbin': self.ncfile['waveFrequency'][:],
                             # 'lat': self.ncfile['lat'][:],
                             # 'lon': self.ncfile['lon'][:],
-                            'Hs':          self.ncfile['waveHs'][self.wavedataindex],
-                            'peakf':       self.ncfile['waveTp'][self.wavedataindex],
+                            'Hs':          self.ncfile['waveHs'][self.ncfileindex],
+                            'peakf':       self.ncfile['waveTp'][self.ncfileindex],
                             'wavedirbin':  self.ncfile['waveDirectionBins'][:],
                             'dWED':        self.ncfile['directionalWaveEnergyDensity'][self.wavedataindex,
                                            :, :],
                             'waveDm':      self.ncfile['waveDm'][self.wavedataindex],
-                            'waveTm':      self.ncfile['waveTm'][self.wavedataindex],
-                            'waveTp':      self.ncfile['waveTp'][self.wavedataindex],
+                            'waveTm':      self.ncfile['waveTm'][self.ncfileindex],
+                            'waveTp':      self.ncfile['waveTp'][self.ncfileindex],
                             'WL':          self.ncfile['waterLevel'][self.wavedataindex],
                             'qcFlagWL':    self.ncfile['qcFlag'][self.wavedataindex, 2],
                             'qcFlagWind':  self.ncfile['qcFlag'][self.wavedataindex, 1]}
