@@ -110,7 +110,6 @@ class TestGetWaveData_IndexOffset:
 
         # Simulate large NCML
         total_records = 274485
-        offset = 174485  # Expected offset for last 100000 records
 
         # Time values
         base_epoch = 1211392800.0  # 2008-05-22
@@ -165,9 +164,9 @@ class TestGetWaveData_IndexOffset:
         mock_ds.__getitem__ = MagicMock(side_effect=ds_getitem)
         mock_dataset.return_value = mock_ds
 
-        # Query for recent data (2026)
-        d1 = DT.datetime(2026, 1, 2)
-        d2 = DT.datetime(2026, 2, 1)
+        # Query for a recent 30-day period (relative to now)
+        d2 = DT.datetime.now()
+        d1 = d2 - DT.timedelta(days=30)
 
         with patch('murgtools.getdata.getDataFRF.nc.num2date') as mock_num2date:
             # Return dates matching the recent time period
