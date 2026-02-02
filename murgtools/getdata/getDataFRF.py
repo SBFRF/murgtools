@@ -10,6 +10,8 @@ import datetime as DT
 import logging
 import os
 import pickle as pickle
+import requests
+import tempfile
 import time
 import warnings
 from posixpath import join as urljoin
@@ -17,6 +19,7 @@ import socket
 import netCDF4 as nc
 import numpy as np
 import pandas as pd
+import tifffile
 
 from murgtools.utils import geoprocess as gp, sblib as sb
 from murgtools import config
@@ -3624,19 +3627,24 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
     Args:
         times (list or datetime): Single datetime or list of datetime objects for
             image retrieval. Each will be rounded to nearest 30-minute interval.
-        location (tuple or dict): Location specification. Can be:
-            - Tuple (x, y): Pixel coordinates (i, j) if coordType='pixel',
+        location (tuple or dict or slice): Location specification. Can be:
+            - Tuple (x, y): Single point - Pixel coordinates (i, j) if coordType='pixel',
               or FRF coordinates if coordType='FRF', or lon/lat if coordType='LL'
             - Dict with keys matching coordType (e.g., {'xFRF': 500, 'yFRF': 100})
+            - Slice: For extracting transects (e.g., slice(None) for full cross-shore,
+              or slice(100, 200) for a range)
         coordType (str, optional): Type of coordinates in location. Options are:
             - 'pixel': Direct pixel indices (i, j)
             - 'FRF': FRF local coordinates (xFRF, yFRF) in meters
             - 'LL' or 'geographic' or 'LatLon': Geographic coordinates (lon, lat)
             - 'spnc' or 'ncsp': NC State Plane coordinates (easting, northing)
             Defaults to 'FRF'.
-        imageType (str, optional): Type of Argus image product. Options are:
-            'timex' (time exposure average, default), 'var' (variance),
-            'snap' (snapshot), 'bright' (brightest pixels), 'dark' (darkest pixels).
+        imageType (str, optional): Type of Argus image product. Available options:
+            - 'timex': Time exposure average (default) - averaged pixel intensities
+            - 'var': Variance image - pixel intensity variance
+            - 'snap': Snapshot - single frame capture
+            - 'bright': Brightest pixels - maximum intensity over collection period
+            - 'dark': Darkest pixels - minimum intensity over collection period
         channel (str or int, optional): Color channel to extract. Options are:
             - 'red' or 'r' or 0: Red channel
             - 'green' or 'g' or 1: Green channel
@@ -3651,9 +3659,10 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
         dict: Dictionary containing:
             - 'time': list of datetime objects for successfully retrieved images
             - 'epochtime': list of epoch times (seconds since 1970-01-01)
-            - 'intensity': numpy array of intensity values. Shape depends on channel:
-                - If channel specified: 1D array [time]
-                - If channel is None: 2D array [time, 3] for RGB channels
+            - 'intensity': numpy array of intensity values. Shape depends on channel and location:
+                - If channel specified and location is point: 1D array [time]
+                - If channel is None and location is point: 2D array [time, 3] for RGB channels
+                - If location is slice: 2D or 3D array [time, slice_dim] or [time, slice_dim, 3]
             - 'location': dict with coordinate information (xFRF, yFRF, pixel_i, pixel_j)
             - 'imageType': str, image type used
             - 'missing_times': list of datetime objects where no image was found
@@ -3677,9 +3686,14 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
         >>> if result:
         ...     print(f"RGB values: {result['intensity']}")  # Shape: [time, 3]
 
-    """
-    import tifffile
+        >>> # Get cross-shore transect at alongshore position
+        >>> location = (slice(None), 500)  # All cross-shore, yFRF=500
+        >>> result = getArgusPixelIntensity(times, location, coordType='pixel',
+        ...                                  imageType='timex', channel='red')
+        >>> if result:
+        ...     print(f"Transect shape: {result['intensity'].shape}")  # Shape: [time, width]
 
+    """
     # Ensure times is a list
     if isinstance(times, DT.datetime):
         times = [times]
@@ -3689,6 +3703,7 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
     pixel_j = None
     xFRF = None
     yFRF = None
+    is_slice = False
 
     # Parse location based on coordType
     if isinstance(location, dict):
@@ -3705,16 +3720,24 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
             easting = location.get('easting', location.get('StateplaneE'))
             northing = location.get('northing', location.get('StateplaneN'))
     elif isinstance(location, (tuple, list)) and len(location) == 2:
-        if coordType.lower() == 'pixel':
-            pixel_i, pixel_j = location
-        elif coordType.lower() in ['frf']:
-            xFRF, yFRF = location
-        elif coordType.lower() in ['ll', 'geographic', 'latlon']:
-            lon, lat = location
-        elif coordType.lower() in ['spnc', 'ncsp']:
-            easting, northing = location
+        # Check if either element is a slice
+        if isinstance(location[0], slice) or isinstance(location[1], slice):
+            is_slice = True
+            if coordType.lower() == 'pixel':
+                pixel_i, pixel_j = location
+            else:
+                raise ValueError("Slice locations are only supported with coordType='pixel'")
+        else:
+            if coordType.lower() == 'pixel':
+                pixel_i, pixel_j = location
+            elif coordType.lower() in ['frf']:
+                xFRF, yFRF = location
+            elif coordType.lower() in ['ll', 'geographic', 'latlon']:
+                lon, lat = location
+            elif coordType.lower() in ['spnc', 'ncsp']:
+                easting, northing = location
     else:
-        raise ValueError("location must be a tuple/list of length 2 or a dictionary with appropriate keys")
+        raise ValueError("location must be a tuple/list of length 2, a slice, or a dictionary with appropriate keys")
 
     # Convert geographic coordinates to FRF if needed, then to pixel
     if coordType.lower() != 'pixel':
@@ -3770,13 +3793,11 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
             # and typical FRF coverage area
 
             # Try to download and parse the actual GeoTIFF to get proper georeferencing
-            import tempfile
             with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
                 tmp_path = tmp.name
 
             try:
                 # Re-download to get geotiff tags
-                import requests
                 resp = requests.get(result['url'], stream=True, timeout=config.DEFAULT_TIMEOUT_SECONDS)
                 resp.raise_for_status()
                 with open(tmp_path, 'wb') as f:
@@ -3819,33 +3840,57 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
                 if os.path.exists(tmp_path):
                     os.unlink(tmp_path)
 
-        # Check if pixel coordinates are within image bounds
+        # Check if pixel coordinates are within image bounds (skip for slices)
         height, width = image.shape[:2]
-        if not (0 <= pixel_i < width and 0 <= pixel_j < height):
-            if verbose:
-                logging.warning(f"Pixel coordinates ({pixel_i}, {pixel_j}) out of bounds "
-                              f"for image size ({width}, {height}) at time {result['time']}")
-            missing_times.append(time_target)
-            continue
+        if not is_slice:
+            if not (0 <= pixel_i < width and 0 <= pixel_j < height):
+                if verbose:
+                    logging.warning(f"Pixel coordinates ({pixel_i}, {pixel_j}) out of bounds "
+                                  f"for image size ({width}, {height}) at time {result['time']}")
+                missing_times.append(time_target)
+                continue
 
         # Extract pixel intensity
         # Note: image indexing is [row, col] = [j, i]
-        pixel_value = image[pixel_j, pixel_i, :]
+        if is_slice:
+            # Handle slice extraction for transects
+            pixel_value = image[pixel_j, pixel_i, :]
+        else:
+            pixel_value = image[pixel_j, pixel_i, :]
 
         # Handle channel selection
         if channel is not None:
-            if channel in ['red', 'r', 0]:
-                intensity = pixel_value[0]
-            elif channel in ['green', 'g', 1]:
-                intensity = pixel_value[1]
-            elif channel in ['blue', 'b', 2]:
-                intensity = pixel_value[2]
-            elif channel in ['gray', 'grey', 'bw']:
-                # Convert to grayscale using standard weights
-                intensity = 0.299 * pixel_value[0] + 0.587 * pixel_value[1] + 0.114 * pixel_value[2]
+            if is_slice:
+                # For slices, apply channel selection across the slice
+                if channel in ['red', 'r', 0]:
+                    intensity = pixel_value[:, :, 0] if pixel_value.ndim == 3 else pixel_value[..., 0]
+                elif channel in ['green', 'g', 1]:
+                    intensity = pixel_value[:, :, 1] if pixel_value.ndim == 3 else pixel_value[..., 1]
+                elif channel in ['blue', 'b', 2]:
+                    intensity = pixel_value[:, :, 2] if pixel_value.ndim == 3 else pixel_value[..., 2]
+                elif channel in ['gray', 'grey', 'bw']:
+                    # Convert to grayscale using standard weights
+                    if pixel_value.ndim == 3:
+                        intensity = 0.299 * pixel_value[:, :, 0] + 0.587 * pixel_value[:, :, 1] + 0.114 * pixel_value[:, :, 2]
+                    else:
+                        intensity = 0.299 * pixel_value[..., 0] + 0.587 * pixel_value[..., 1] + 0.114 * pixel_value[..., 2]
+                else:
+                    raise ValueError(f"Invalid channel '{channel}'. Must be one of: "
+                                   "'red'/'r'/0, 'green'/'g'/1, 'blue'/'b'/2, 'gray'/'grey'/'bw', or None")
             else:
-                raise ValueError(f"Invalid channel '{channel}'. Must be one of: "
-                               "'red'/'r'/0, 'green'/'g'/1, 'blue'/'b'/2, 'gray'/'grey'/'bw', or None")
+                # Single point extraction
+                if channel in ['red', 'r', 0]:
+                    intensity = pixel_value[0]
+                elif channel in ['green', 'g', 1]:
+                    intensity = pixel_value[1]
+                elif channel in ['blue', 'b', 2]:
+                    intensity = pixel_value[2]
+                elif channel in ['gray', 'grey', 'bw']:
+                    # Convert to grayscale using standard weights
+                    intensity = 0.299 * pixel_value[0] + 0.587 * pixel_value[1] + 0.114 * pixel_value[2]
+                else:
+                    raise ValueError(f"Invalid channel '{channel}'. Must be one of: "
+                                   "'red'/'r'/0, 'green'/'g'/1, 'blue'/'b'/2, 'gray'/'grey'/'bw', or None")
         else:
             intensity = pixel_value
 

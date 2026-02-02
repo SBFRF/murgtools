@@ -163,36 +163,16 @@ if __name__ == '__main__':
     print("\n" + "=" * 70)
     print("Argus Pixel Intensity Extraction Examples")
     print("=" * 70)
-    print("\nNote: These examples will attempt to download real Argus imagery")
-    print("from the FRF server. Some may fail if imagery is not available")
+    print("\nNote: This example will attempt to download real Argus imagery")
+    print("from the FRF server. It may fail if imagery is not available")
     print("for the specified times.")
 
-    # Run examples
-    try:
-        example_pixel_coordinates()
-    except Exception as e:
-        print(f"\nExample 1 failed: {e}")
-
+    # Run only the FRF coordinates example
     try:
         example_frf_coordinates()
     except Exception as e:
-        print(f"\nExample 2 failed: {e}")
-
-    try:
-        example_latlon_coordinates()
-    except Exception as e:
-        print(f"\nExample 3 failed: {e}")
-
-    try:
-        example_multiple_image_types()
-    except Exception as e:
-        print(f"\nExample 4 failed: {e}")
-
-    try:
-        example_location_dict()
-    except Exception as e:
-        print(f"\nExample 5 failed: {e}")
+        print(f"\nExample failed: {e}")
 
     print("\n" + "=" * 70)
-    print("Examples complete")
+    print("Example complete")
     print("=" * 70)
