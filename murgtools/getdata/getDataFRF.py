@@ -319,7 +319,7 @@ class getObs:
         try:
             self.wavedataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
                                          epochEnd=self.epochd2)
-            if self.wavedataindex is None:
+            if self.wavedataindex is None or np.size(self.wavedataindex) == 0:
                 raise ValueError('there is no data in your time period')
             # Compute absolute index for netCDF file access when getnc() returned a subset
             indexOffset = indexRef[0] if indexRef is not None else 0
@@ -492,6 +492,10 @@ class getObs:
 
             gaugenumber = [6, 'adop-3.5m'] (Default value = 5)
 
+            gaugenumber = ['sig940-300', '940-300']
+
+            gaugenumber = ['sig769-300', '769-300']
+
           roundto: the time over which the wind record exists, ie data is collected in 10 minute
           increments
             data is rounded to the nearst [roundto] (default 1 min)
@@ -545,7 +549,7 @@ class getObs:
             self.dataloc = 'oceanography/currents/awac-5m/awac-5m.ncml'
         elif gaugenumber in [6, 'adop-3.5m']:
             self.dataloc = 'oceanography/currents/adop-3.5m/adop-3.5m.ncml'
-        # AWAC at jetty pier
+        # AWAC at jenttes pier
         elif gauge_lower in ['awac-jpier-11m', 'awac-jpier', 'jpier-11m']:
             self.dataloc = 'oceanography/currents/awac-jpier-11m/awac-jpier-11m.ncml'
         # Nortek Signature profilers
@@ -3236,7 +3240,7 @@ class getDataTestBed:
                             'Hs':          self.ncfile['waveHs'][self.ncfileindex],
                             'peakf':       self.ncfile['waveTp'][self.ncfileindex],
                             'wavedirbin':  self.ncfile['waveDirectionBins'][:],
-                            'dWED':        self.ncfile['directionalWaveEnergyDensity'][self.wavedataindex,
+                            'dWED':        self.ncfile['directionalWaveEnergyDensity'][self.ncfileindex,
                                            :, :],
                             'waveDm':      self.ncfile['waveDm'][self.wavedataindex],
                             'waveTm':      self.ncfile['waveTm'][self.ncfileindex],
