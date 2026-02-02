@@ -3236,7 +3236,7 @@ class getDataTestBed:
                             'Hs':          self.ncfile['waveHs'][self.ncfileindex],
                             'peakf':       self.ncfile['waveTp'][self.ncfileindex],
                             'wavedirbin':  self.ncfile['waveDirectionBins'][:],
-                            'dWED':        self.ncfile['directionalWaveEnergyDensity'][self.wavedataindex,
+                            'dWED':        self.ncfile['directionalWaveEnergyDensity'][self.ncfileindex,
                                            :, :],
                             'waveDm':      self.ncfile['waveDm'][self.wavedataindex],
                             'waveTm':      self.ncfile['waveTm'][self.ncfileindex],
