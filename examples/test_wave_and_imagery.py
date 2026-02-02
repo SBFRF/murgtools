@@ -162,7 +162,11 @@ def main():
             ax1.plot(data['time'], data['Hs'], label=gauge_name, color=color, linewidth=1.5)
 
     ax1.set_ylabel('Significant Wave Height (m)')
-    ax1.set_title(f'Wave Height at FRF Gauges\n{d1.strftime("%d-%b")} to {d2.strftime("%d-%b")}')
+    if d1.year == d2.year:
+        date_range_str = f'{d1.strftime("%d-%b")} to {d2.strftime("%d-%b-%Y")}'
+    else:
+        date_range_str = f'{d1.strftime("%d-%b-%Y")} to {d2.strftime("%d-%b-%Y")}'
+    ax1.set_title(f'Wave Height at FRF Gauges\n{date_range_str}')
     ax1.legend(loc='upper right', fontsize=8, ncol=2)
     ax1.grid(True, alpha=0.3)
     ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d-%b'))
