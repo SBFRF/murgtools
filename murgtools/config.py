@@ -62,6 +62,8 @@ FRF_IP_PREFIXES = ('134.164', '10.0.0')
 DEFAULT_TIMEOUT_SECONDS = 60
 
 # Maximum retry attempts for network operations
+# Used in getdata/getDataFRF.py getnc() function when fetching NetCDF files from THREDDS servers
+# If a network error occurs, the function will retry up to this many times before giving up
 MAX_RETRY_ATTEMPTS = 3
 
 # =============================================================================
@@ -72,6 +74,8 @@ MAX_RETRY_ATTEMPTS = 3
 ARGUS_IMAGE_INTERVAL_MINUTES = 30
 
 # Default time rounding (seconds)
+# Used in getdata/getDataFRF.py getnc() function to round timestamps from NetCDF files
+# This ensures consistent time intervals when retrieving oceanographic and meteorological data
 DEFAULT_TIME_ROUND_SECONDS = 60
 
 # NetCDF time units standard

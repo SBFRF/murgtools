@@ -50,7 +50,7 @@ def gettime(allEpoch, epochStart, epochEnd, indexRef=0):
     finally:
         return idx
 
-def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=60, cutrange=100000,**kwargs):
+def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=None, cutrange=100000,**kwargs):
     """Function grabs the netCDF file interested.
     
     Responsible for drilling down to specific monthly file if applicable to speed things up.
@@ -59,7 +59,7 @@ def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=60, cutrange=100000
         dataLoc (str):
         THREDDS (str): a key associated with the server location
         callingClass (str): which class calls this
-        dtRound(int): rounding the times returned from the server (Default=60 (s))
+        dtRound(int): rounding the times returned from the server (Default from config.DEFAULT_TIME_ROUND_SECONDS)
 
     Keyword Args:
         start: if given, will parse out to monthly netCDF file (if query is in same month)
@@ -76,6 +76,10 @@ def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=60, cutrange=100000
     server = kwargs.get('server', None)
     # a list of data sets (just the ncml) that shouldn't drill down to monthly file
     doNotDrillList = ['survey', 'integratedBathyTopo']
+    
+    # Use config default if dtRound not specified
+    if dtRound is None:
+        dtRound = config.DEFAULT_TIME_ROUND_SECONDS
 
     # chose which server to select based on IP using centralized config
     THREDDSloc, pName = config.get_thredds_server(server=server)
@@ -116,7 +120,7 @@ def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=60, cutrange=100000
         ncfileURL = urljoin(THREDDSloc, pName, dataLoc)
     
     # ___________________ go now to open file   ___________________________________________
-    finished, n, maxTries = False, 0, 3  # initializing variables to iterate over
+    finished, n, maxTries = False, 0, config.MAX_RETRY_ATTEMPTS  # initializing variables to iterate over
     ncFile, allEpoch = None, None  # will return None's when URL doesn't exist
     logging.debug(ncfileURL)
     indexRef = [0]
