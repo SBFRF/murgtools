@@ -57,7 +57,6 @@ class TestGetnc_IndexRef:
 
         # Simulate NCML where query is within sampled range
         total_records = 200000
-        cutrange = 100000
         base_epoch = 1577836800.0  # 2020-01-01
 
         time_values = np.array([base_epoch + i * 1800 for i in range(total_records)])
