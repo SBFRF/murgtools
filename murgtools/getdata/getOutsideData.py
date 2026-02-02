@@ -10,6 +10,7 @@ import numpy as np
 from pyproj import Transformer
 
 from murgtools import config
+from pyproj import Transformer
 
 class forecastData:
     """A data retrival class situated around gathering forecast data."""
@@ -419,18 +420,20 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
                     hemisphere = match.group(2)
                     epsg = 32600 + zone if hemisphere == 'N' else 32700 + zone
                 else:
-                    epsg = 32618  # Default to zone 18N for FRF area
-            else:
-                epsg = 32618
+                    epsg = 32618
 
             # Convert UTM corners to lat/lon
             transformer = Transformer.from_crs(f'EPSG:{epsg}', 'EPSG:4326', always_xy=True)
 
-            tl_lon, tl_lat = transformer.transform(utm_left, utm_top)
-            br_lon, br_lat = transformer.transform(utm_right, utm_bottom)
+                tl_lon, tl_lat = transformer.transform(utm_left, utm_top)
+                br_lon, br_lat = transformer.transform(utm_right, utm_bottom)
 
-            # scene_bbox in lat/lon: [west, south, east, north]
-            scene_bbox = [tl_lon, br_lat, br_lon, tl_lat]
+                # scene_bbox in lat/lon: [west, south, east, north]
+                scene_bbox = [tl_lon, br_lat, br_lon, tl_lat]
+        except KeyError:
+            # Missing GeoTIFF georeferencing tags; fall back to STAC bbox if available.
+            if isinstance(item, dict) and 'bbox' in item:
+                scene_bbox = item['bbox']
     finally:
         os.unlink(tmp_path)
 
