@@ -5,7 +5,6 @@ This script shows how to extract pixel intensity values from Argus imagery
 at specified locations using different coordinate systems.
 """
 import datetime as DT
-import numpy as np
 from murgtools.getdata import getArgusPixelIntensity
 
 
