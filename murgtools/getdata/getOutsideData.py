@@ -3,10 +3,12 @@
 import datetime as DT
 import netCDF4 as nc
 import os
+import re
 import numpy as np
 import sys
 
 from murgtools import config
+from pyproj import Transformer
 
 class forecastData:
     """A data retrival class situated around gathering forecast data."""
@@ -410,7 +412,6 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
             if proj_str:
                 proj_str = proj_str.value
                 # Parse UTM zone from string like "WGS 84 / UTM zone 18N"
-                import re
                 match = re.search(r'UTM zone (\d+)([NS])', str(proj_str))
                 if match:
                     zone = int(match.group(1))
@@ -422,7 +423,6 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
                 epsg = 32618
 
             # Convert UTM corners to lat/lon
-            from pyproj import Transformer
             transformer = Transformer.from_crs(f'EPSG:{epsg}', 'EPSG:4326', always_xy=True)
 
             tl_lon, tl_lat = transformer.transform(utm_left, utm_top)
