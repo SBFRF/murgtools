@@ -115,10 +115,16 @@ def conditions_plot(time_list, start_date, end_date, gauge='waverider-17m',
     all_data = gd.getWaveData(gauge, spec=False)
 
     # Convert times to datetime.datetime for easier manipulation
-    all_data_dates = np.array([
-        dt.datetime(d.year, d.month, d.day, d.hour, d.minute) 
-        for d in all_data['time']
-    ])
+    # Handle both datetime objects and netCDF4 datetime objects
+    if hasattr(all_data['time'][0], 'timetuple'):
+        # Already datetime-compatible, just ensure they're regular datetime objects
+        all_data_dates = np.array([
+            dt.datetime(d.year, d.month, d.day, d.hour, d.minute) 
+            for d in all_data['time']
+        ])
+    else:
+        # If they're some other type, try to convert directly
+        all_data_dates = np.array(all_data['time'])
 
     # Handle Tp if requested but not in data (compute from peakf)
     if y_var == 'Tp' and 'Tp' not in all_data:
