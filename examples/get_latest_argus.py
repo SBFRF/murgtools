@@ -1,19 +1,26 @@
 """
-Fetch the latest Argus bright image and save as GeoTIFF.
+Fetch the latest Argus image and save as GeoTIFF.
 
-This script retrieves the most recent 'bright' (brightest pixels composite)
-Argus orthophoto from the FRF coastal imaging server and saves it as a GeoTIFF.
+This script retrieves the most recent Argus orthophoto from the FRF coastal imaging server
+and saves it as a GeoTIFF. Supports multiple image types: 'bright', 'timex', 'snap', 'dark'.
 """
+import argparse
 import datetime as DT
 import os
 from murgtools.getdata import findArgusImagery
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Fetch the latest Argus imagery from FRF')
+    parser.add_argument('image_type', 
+                        choices=['bright', 'timex', 'snap', 'dark', 'var'],
+                        help='Type of Argus image to retrieve')
+    args = parser.parse_args()
+    
     # Output filename
-    output_file = 'latest_argus_bright.tif'
-    image_type = 'bright'
-    print("Searching for latest Argus bright image...")
+    image_type = args.image_type
+    output_file = f'latest_argus_{image_type}.tif'
+    print(f"Searching for latest Argus {image_type} image...")
 
     # Get local time for reference and UTC time for API call
     local_time = DT.datetime.now()
