@@ -3641,7 +3641,7 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
             Defaults to 'FRF'.
         imageType (str, optional): Type of Argus image product. Available options:
             - 'timex': Time exposure average (default) - averaged pixel intensities
-            - 'var': Variance image - pixel intensity variance
+            - 'gray' or 'grey' or 'bw': Grayscale (weighted average using standard luminance formula)
             - 'snap': Snapshot - single frame capture
             - 'bright': Brightest pixels - maximum intensity over collection period
             - 'dark': Darkest pixels - minimum intensity over collection period
