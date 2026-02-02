@@ -491,7 +491,7 @@ class TestGetObsGetWind:
         d2 = DT.datetime(2020, 1, 2)
 
         from murgtools.getdata.getDataFRF import getObs
-        obs = getObs(d1, d2)
+        getObs(d1, d2)
 
         # Test gauge selection by checking dataloc would be set correctly
         gauge_mappings = {
