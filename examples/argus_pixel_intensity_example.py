@@ -92,7 +92,7 @@ def example_latlon_coordinates():
         DT.datetime(2024, 6, 15, 14, 0, 0),
     ]
 
-    # Extract grayscale (average of RGB)
+    # Extract grayscale (weighted luminance)
     result = getArgusPixelIntensity(
         times=times,
         location=location,
