@@ -3611,3 +3611,263 @@ def findArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=T
         logging.warning(f"No Argus imagery found within {search_window_hours} hours of "
                        f"{time_requested.strftime('%Y-%m-%d %H:%M')}")
     return None
+
+
+def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex', 
+                           channel=None, verbose=True, **kwargs):
+    """Extract pixel intensity values from Argus imagery at a specified location.
+
+    This function wraps getArgusImagery to extract pixel intensities over multiple
+    times and image types. It handles coordinate transformations and returns timestamps
+    with pixel values to account for gaps in imagery.
+
+    Args:
+        times (list or datetime): Single datetime or list of datetime objects for 
+            image retrieval. Each will be rounded to nearest 30-minute interval.
+        location (tuple or dict): Location specification. Can be:
+            - Tuple (x, y): Pixel coordinates (i, j) if coordType='pixel', 
+              or FRF coordinates if coordType='FRF', or lon/lat if coordType='LL'
+            - Dict with keys matching coordType (e.g., {'xFRF': 500, 'yFRF': 100})
+        coordType (str, optional): Type of coordinates in location. Options are:
+            - 'pixel': Direct pixel indices (i, j)
+            - 'FRF': FRF local coordinates (xFRF, yFRF) in meters
+            - 'LL' or 'geographic' or 'LatLon': Geographic coordinates (lon, lat)
+            - 'spnc' or 'ncsp': NC State Plane coordinates (easting, northing)
+            Defaults to 'FRF'.
+        imageType (str, optional): Type of Argus image product. Options are:
+            'timex' (time exposure average, default), 'var' (variance),
+            'snap' (snapshot), 'bright' (brightest pixels), 'dark' (darkest pixels).
+        channel (str or int, optional): Color channel to extract. Options are:
+            - 'red' or 'r' or 0: Red channel
+            - 'green' or 'g' or 1: Green channel  
+            - 'blue' or 'b' or 2: Blue channel
+            - 'gray' or 'grey' or 'bw': Grayscale (average of RGB)
+            - None: Return all RGB channels (default)
+        verbose (bool, optional): Enable logging output. Defaults to True.
+        **kwargs: Additional arguments passed to findArgusImagery (e.g., 
+            search_window_hours, method)
+
+    Returns:
+        dict: Dictionary containing:
+            - 'time': list of datetime objects for successfully retrieved images
+            - 'epochtime': list of epoch times (seconds since 1970-01-01)
+            - 'intensity': numpy array of intensity values. Shape depends on channel:
+                - If channel specified: 1D array [time]
+                - If channel is None: 2D array [time, 3] for RGB channels
+            - 'location': dict with coordinate information (xFRF, yFRF, pixel_i, pixel_j)
+            - 'imageType': str, image type used
+            - 'missing_times': list of datetime objects where no image was found
+        Returns None if no valid images could be retrieved.
+
+    Example:
+        >>> import datetime as DT
+        >>> # Get pixel intensity at FRF coordinates over time
+        >>> times = [DT.datetime(2024, 6, 15, 12, 0, 0),
+        ...          DT.datetime(2024, 6, 15, 13, 0, 0)]
+        >>> location = (500, 100)  # xFRF, yFRF in meters
+        >>> result = getArgusPixelIntensity(times, location, coordType='FRF', 
+        ...                                  imageType='timex', channel='red')
+        >>> if result:
+        ...     print(f"Retrieved {len(result['time'])} images")
+        ...     print(f"Red channel intensities: {result['intensity']}")
+        
+        >>> # Get RGB values at pixel location
+        >>> location = (100, 200)  # pixel i, j
+        >>> result = getArgusPixelIntensity(times, location, coordType='pixel')
+        >>> if result:
+        ...     print(f"RGB values: {result['intensity']}")  # Shape: [time, 3]
+
+    """
+    import tifffile
+
+    # Ensure times is a list
+    if isinstance(times, DT.datetime):
+        times = [times]
+
+    # Parse location based on coordType
+    if isinstance(location, dict):
+        if coordType.lower() == 'pixel':
+            pixel_i = location.get('i', location.get('pixel_i'))
+            pixel_j = location.get('j', location.get('pixel_j'))
+        elif coordType.lower() in ['frf']:
+            xFRF = location.get('xFRF', location.get('x'))
+            yFRF = location.get('yFRF', location.get('y'))
+        elif coordType.lower() in ['ll', 'geographic', 'latlon']:
+            lon = location.get('lon', location.get('longitude'))
+            lat = location.get('lat', location.get('latitude'))
+        elif coordType.lower() in ['spnc', 'ncsp']:
+            easting = location.get('easting', location.get('StateplaneE'))
+            northing = location.get('northing', location.get('StateplaneN'))
+    elif isinstance(location, (tuple, list)) and len(location) == 2:
+        if coordType.lower() == 'pixel':
+            pixel_i, pixel_j = location
+        elif coordType.lower() in ['frf']:
+            xFRF, yFRF = location
+        elif coordType.lower() in ['ll', 'geographic', 'latlon']:
+            lon, lat = location
+        elif coordType.lower() in ['spnc', 'ncsp']:
+            easting, northing = location
+    else:
+        raise ValueError("location must be a tuple/list of length 2 or a dictionary with appropriate keys")
+
+    # Convert geographic coordinates to FRF if needed, then to pixel
+    if coordType.lower() != 'pixel':
+        # Convert to FRF coordinates if not already
+        if coordType.lower() in ['frf']:
+            pass  # Already have xFRF, yFRF
+        elif coordType.lower() in ['ll', 'geographic', 'latlon']:
+            coords = gp.FRFcoord(lon, lat, coordType='LL')
+            xFRF = coords['xFRF']
+            yFRF = coords['yFRF']
+        elif coordType.lower() in ['spnc', 'ncsp']:
+            coords = gp.FRFcoord(easting, northing, coordType='spnc')
+            xFRF = coords['xFRF']
+            yFRF = coords['yFRF']
+        else:
+            raise ValueError(f"Invalid coordType '{coordType}'. Must be one of: "
+                           "'pixel', 'FRF', 'LL', 'geographic', 'LatLon', 'spnc', 'ncsp'")
+
+    # Initialize result containers
+    valid_times = []
+    valid_epochtimes = []
+    intensities = []
+    missing_times = []
+
+    # Process each time
+    for time_target in times:
+        # Try to get the image using findArgusImagery if search parameters provided
+        if 'search_window_hours' in kwargs or 'method' in kwargs:
+            result = findArgusImagery(time_target, filename=None, imageType=imageType, 
+                                    verbose=verbose, **kwargs)
+        else:
+            result = getArgusImagery(time_target, filename=None, imageType=imageType, 
+                                   verbose=verbose)
+
+        if result is None:
+            if verbose:
+                logging.warning(f"No image found for time {time_target}")
+            missing_times.append(time_target)
+            continue
+
+        # Get image and geotiff extent
+        image = result['image']
+        
+        # For GeoTIFF, we need to convert FRF coordinates to pixel coordinates
+        # We'll do this by creating a temporary file or using the returned image metadata
+        # The image extent in the GeoTIFF should be in state plane or FRF coordinates
+        
+        # Get pixel coordinates if we have FRF coordinates
+        if coordType.lower() != 'pixel':
+            # We need to get the geotiff extent to map FRF to pixel coordinates
+            # The Argus GeoTIFFs use a specific coordinate system
+            # For now, we'll use a simple approach based on the image dimensions
+            # and typical FRF coverage area
+            
+            # Try to download and parse the actual GeoTIFF to get proper georeferencing
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+                tmp_path = tmp.name
+            
+            try:
+                # Re-download to get geotiff tags
+                import requests
+                resp = requests.get(result['url'], stream=True, timeout=config.DEFAULT_TIMEOUT_SECONDS)
+                resp.raise_for_status()
+                with open(tmp_path, 'wb') as f:
+                    for chunk in resp.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                
+                # Parse GeoTIFF to get coordinate transformation
+                with tifffile.TiffFile(tmp_path) as tif:
+                    tags = tif.pages[0].tags
+                    # GeoTIFF tags: 33922=ModelTiepointTag, 33550=ModelPixelScaleTag
+                    if 33922 in tags and 33550 in tags:
+                        tiepoint = tags[33922].value  # (i, j, k, x, y, z)
+                        scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
+                        
+                        # tiepoint: pixel (i,j) maps to world coordinates (x,y)
+                        # Convention: tiepoint = (pixel_i, pixel_j, 0, world_x, world_y, 0)
+                        origin_i, origin_j = tiepoint[0], tiepoint[1]
+                        origin_x, origin_y = tiepoint[3], tiepoint[4]
+                        scale_x, scale_y = scale[0], scale[1]
+                        
+                        # The world coordinates are likely in NC State Plane
+                        # Convert FRF to state plane
+                        frf_sp = gp.FRF2ncsp(xFRF, yFRF)
+                        sp_x = frf_sp['StateplaneE']
+                        sp_y = frf_sp['StateplaneN']
+                        
+                        # Convert state plane to pixel coordinates
+                        # pixel_i = (sp_x - origin_x) / scale_x + origin_i
+                        # pixel_j = (sp_y - origin_y) / scale_y + origin_j
+                        # Note: scale_y is typically negative (y increases downward in images)
+                        pixel_i = int(round((sp_x - origin_x) / scale_x + origin_i))
+                        pixel_j = int(round((sp_y - origin_y) / scale_y + origin_j))
+                    else:
+                        if verbose:
+                            logging.warning("GeoTIFF tags not found, skipping image")
+                        missing_times.append(time_target)
+                        continue
+            finally:
+                # Clean up temp file
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+        
+        # Check if pixel coordinates are within image bounds
+        height, width = image.shape[:2]
+        if not (0 <= pixel_i < width and 0 <= pixel_j < height):
+            if verbose:
+                logging.warning(f"Pixel coordinates ({pixel_i}, {pixel_j}) out of bounds "
+                              f"for image size ({width}, {height}) at time {result['time']}")
+            missing_times.append(time_target)
+            continue
+
+        # Extract pixel intensity
+        # Note: image indexing is [row, col] = [j, i]
+        pixel_value = image[pixel_j, pixel_i, :]
+
+        # Handle channel selection
+        if channel is not None:
+            if channel in ['red', 'r', 0]:
+                intensity = pixel_value[0]
+            elif channel in ['green', 'g', 1]:
+                intensity = pixel_value[1]
+            elif channel in ['blue', 'b', 2]:
+                intensity = pixel_value[2]
+            elif channel in ['gray', 'grey', 'bw']:
+                # Convert to grayscale using standard weights
+                intensity = 0.299 * pixel_value[0] + 0.587 * pixel_value[1] + 0.114 * pixel_value[2]
+            else:
+                raise ValueError(f"Invalid channel '{channel}'. Must be one of: "
+                               "'red'/'r'/0, 'green'/'g'/1, 'blue'/'b'/2, 'gray'/'grey'/'bw', or None")
+        else:
+            intensity = pixel_value
+
+        valid_times.append(result['time'])
+        valid_epochtimes.append(result['epochtime'])
+        intensities.append(intensity)
+
+    # Return None if no valid images were found
+    if len(valid_times) == 0:
+        if verbose:
+            logging.warning("No valid images found for any of the requested times")
+        return None
+
+    # Build location info dictionary
+    location_info = {
+        'pixel_i': pixel_i,
+        'pixel_j': pixel_j,
+    }
+    if coordType.lower() != 'pixel':
+        location_info['xFRF'] = xFRF
+        location_info['yFRF'] = yFRF
+
+    # Prepare output
+    return {
+        'time': valid_times,
+        'epochtime': valid_epochtimes,
+        'intensity': np.array(intensities),
+        'location': location_info,
+        'imageType': imageType,
+        'missing_times': missing_times,
+    }

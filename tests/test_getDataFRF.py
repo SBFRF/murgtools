@@ -1,7 +1,9 @@
 """Unit tests for getDataFRF module."""
 import datetime as DT
+import os
 import numpy as np
 import pytest
+import netCDF4 as nc
 from unittest.mock import MagicMock, patch, PropertyMock
 
 from murgtools.getdata.getDataFRF import gettime, removeDuplicatesFromDictionary
@@ -882,3 +884,358 @@ class TestNewGaugeURLLookups:
         for gauge in directional_gauges:
             assert gauge in obs.directionalWaveGaugeList, \
                 f"{gauge} should be in directionalWaveGaugeList"
+
+
+class TestGetArgusPixelIntensity:
+    """Tests for the getArgusPixelIntensity function."""
+
+    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    def test_single_time_pixel_coords(self, mock_get_imagery):
+        """Test extraction with single time and pixel coordinates."""
+        from murgtools.getdata.getDataFRF import getArgusPixelIntensity
+
+        # Mock image data
+        mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
+        mock_image[200, 150, :] = [255, 128, 64]  # Set specific pixel
+        
+        mock_get_imagery.return_value = {
+            'image': mock_image,
+            'time': DT.datetime(2024, 6, 15, 12, 0, 0),
+            'epochtime': 1718452800.0,
+            'imageType': 'timex',
+            'url': 'http://test.com/image.tif',
+        }
+
+        result = getArgusPixelIntensity(
+            DT.datetime(2024, 6, 15, 12, 0, 0),
+            location=(150, 200),
+            coordType='pixel',
+            verbose=False
+        )
+
+        assert result is not None
+        assert len(result['time']) == 1
+        assert len(result['intensity']) == 1
+        np.testing.assert_array_equal(result['intensity'][0], [255, 128, 64])
+        assert result['location']['pixel_i'] == 150
+        assert result['location']['pixel_j'] == 200
+
+    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    def test_multiple_times(self, mock_get_imagery):
+        """Test extraction over multiple times."""
+        from murgtools.getdata.getDataFRF import getArgusPixelIntensity
+
+        # Mock responses for multiple times
+        def mock_imagery_side_effect(dateOfInterest, **kwargs):
+            mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
+            mock_image[200, 150, :] = [255, 128, 64]
+            return {
+                'image': mock_image,
+                'time': dateOfInterest,
+                'epochtime': nc.date2num(dateOfInterest, 'seconds since 1970-01-01'),
+                'imageType': 'timex',
+                'url': 'http://test.com/image.tif',
+            }
+
+        mock_get_imagery.side_effect = mock_imagery_side_effect
+
+        times = [
+            DT.datetime(2024, 6, 15, 12, 0, 0),
+            DT.datetime(2024, 6, 15, 13, 0, 0),
+            DT.datetime(2024, 6, 15, 14, 0, 0),
+        ]
+
+        result = getArgusPixelIntensity(
+            times,
+            location=(150, 200),
+            coordType='pixel',
+            verbose=False
+        )
+
+        assert result is not None
+        assert len(result['time']) == 3
+        assert len(result['intensity']) == 3
+        assert len(result['missing_times']) == 0
+
+    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    def test_missing_times_handling(self, mock_get_imagery):
+        """Test that missing times are properly tracked."""
+        from murgtools.getdata.getDataFRF import getArgusPixelIntensity
+
+        # Mock: first and third succeed, second fails
+        call_count = [0]
+        
+        def mock_imagery_side_effect(dateOfInterest, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 2:  # Second call returns None
+                return None
+            
+            mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
+            mock_image[200, 150, :] = [255, 128, 64]
+            return {
+                'image': mock_image,
+                'time': dateOfInterest,
+                'epochtime': nc.date2num(dateOfInterest, 'seconds since 1970-01-01'),
+                'imageType': 'timex',
+                'url': 'http://test.com/image.tif',
+            }
+
+        mock_get_imagery.side_effect = mock_imagery_side_effect
+
+        times = [
+            DT.datetime(2024, 6, 15, 12, 0, 0),
+            DT.datetime(2024, 6, 15, 13, 0, 0),  # This will fail
+            DT.datetime(2024, 6, 15, 14, 0, 0),
+        ]
+
+        result = getArgusPixelIntensity(
+            times,
+            location=(150, 200),
+            coordType='pixel',
+            verbose=False
+        )
+
+        assert result is not None
+        assert len(result['time']) == 2
+        assert len(result['intensity']) == 2
+        assert len(result['missing_times']) == 1
+        assert result['missing_times'][0] == times[1]
+
+    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    def test_channel_extraction(self, mock_get_imagery):
+        """Test extraction of specific color channels."""
+        from murgtools.getdata.getDataFRF import getArgusPixelIntensity
+
+        mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
+        mock_image[200, 150, :] = [255, 128, 64]
+        
+        mock_get_imagery.return_value = {
+            'image': mock_image,
+            'time': DT.datetime(2024, 6, 15, 12, 0, 0),
+            'epochtime': 1718452800.0,
+            'imageType': 'timex',
+            'url': 'http://test.com/image.tif',
+        }
+
+        # Test red channel
+        result = getArgusPixelIntensity(
+            DT.datetime(2024, 6, 15, 12, 0, 0),
+            location=(150, 200),
+            coordType='pixel',
+            channel='red',
+            verbose=False
+        )
+        assert result['intensity'][0] == 255
+
+        # Test green channel
+        result = getArgusPixelIntensity(
+            DT.datetime(2024, 6, 15, 12, 0, 0),
+            location=(150, 200),
+            coordType='pixel',
+            channel='green',
+            verbose=False
+        )
+        assert result['intensity'][0] == 128
+
+        # Test blue channel
+        result = getArgusPixelIntensity(
+            DT.datetime(2024, 6, 15, 12, 0, 0),
+            location=(150, 200),
+            coordType='pixel',
+            channel='blue',
+            verbose=False
+        )
+        assert result['intensity'][0] == 64
+
+    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    def test_grayscale_conversion(self, mock_get_imagery):
+        """Test grayscale conversion."""
+        from murgtools.getdata.getDataFRF import getArgusPixelIntensity
+
+        mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
+        mock_image[200, 150, :] = [255, 128, 64]
+        
+        mock_get_imagery.return_value = {
+            'image': mock_image,
+            'time': DT.datetime(2024, 6, 15, 12, 0, 0),
+            'epochtime': 1718452800.0,
+            'imageType': 'timex',
+            'url': 'http://test.com/image.tif',
+        }
+
+        result = getArgusPixelIntensity(
+            DT.datetime(2024, 6, 15, 12, 0, 0),
+            location=(150, 200),
+            coordType='pixel',
+            channel='gray',
+            verbose=False
+        )
+
+        # Grayscale: 0.299*R + 0.587*G + 0.114*B
+        expected = 0.299 * 255 + 0.587 * 128 + 0.114 * 64
+        assert np.isclose(result['intensity'][0], expected)
+
+    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    def test_out_of_bounds_pixel(self, mock_get_imagery):
+        """Test handling of out-of-bounds pixel coordinates."""
+        from murgtools.getdata.getDataFRF import getArgusPixelIntensity
+
+        mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
+        
+        mock_get_imagery.return_value = {
+            'image': mock_image,
+            'time': DT.datetime(2024, 6, 15, 12, 0, 0),
+            'epochtime': 1718452800.0,
+            'imageType': 'timex',
+            'url': 'http://test.com/image.tif',
+        }
+
+        # Pixel coordinates out of bounds (image is 1500x1000)
+        result = getArgusPixelIntensity(
+            DT.datetime(2024, 6, 15, 12, 0, 0),
+            location=(2000, 200),  # x out of bounds
+            coordType='pixel',
+            verbose=False
+        )
+
+        assert result is None or len(result['missing_times']) == 1
+
+    @patch('requests.get')
+    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.utils.geoprocess.FRF2ncsp')
+    def test_frf_coordinates(self, mock_frf2ncsp, mock_get_imagery, mock_requests_get):
+        """Test extraction using FRF coordinates."""
+        from murgtools.getdata.getDataFRF import getArgusPixelIntensity
+        import tempfile
+        import tifffile
+        
+        # Create a minimal valid GeoTIFF
+        mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
+        mock_image[200, 150, :] = [255, 128, 64]
+        
+        mock_get_imagery.return_value = {
+            'image': mock_image,
+            'time': DT.datetime(2024, 6, 15, 12, 0, 0),
+            'epochtime': 1718452800.0,
+            'imageType': 'timex',
+            'url': 'http://test.com/image.tif',
+        }
+        
+        # Mock FRF to state plane conversion
+        # This will give state plane coordinates: (902000.0, 274500.0)
+        mock_frf2ncsp.return_value = {
+            'StateplaneE': 902000.0,
+            'StateplaneN': 274500.0,
+        }
+        
+        # Create a mock GeoTIFF file with proper tags
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+            # Create GeoTIFF with tags using extratags parameter
+            # ModelTiepointTag: (pixel_i, pixel_j, 0, world_x, world_y, 0)
+            # Let's set it so pixel (0, 0) is at state plane (900500.0, 276000.0)
+            # and pixel (150, 200) should be at approximately (902000.0, 274000.0)
+            # with scale_x=10, scale_y=-10
+            # Then: world_x = 900500 + 150*10 = 902000 ✓
+            #       world_y = 276000 + 200*(-10) = 274000 (close to 274500)
+            tiepoint = [0.0, 0.0, 0.0, 900500.0, 276000.0, 0.0]
+            # ModelPixelScaleTag: (scale_x, scale_y, scale_z)
+            # scale_y is negative in GeoTIFF (y decreases as row increases)
+            scale = [10.0, -10.0, 0.0]  # 10 meters per pixel
+            
+            extratags = [
+                (33922, 'd', 6, tiepoint, True),  # ModelTiepointTag
+                (33550, 'd', 3, scale, True),     # ModelPixelScaleTag
+            ]
+            
+            tifffile.imwrite(tmp_path, mock_image, extratags=extratags)
+        
+        try:
+            # Mock requests.get to return the temp file content
+            with open(tmp_path, 'rb') as f:
+                file_content = f.read()
+            
+            mock_response = MagicMock()
+            mock_response.iter_content = MagicMock(return_value=[file_content])
+            mock_response.raise_for_status = MagicMock()
+            mock_requests_get.return_value = mock_response
+            
+            result = getArgusPixelIntensity(
+                DT.datetime(2024, 6, 15, 12, 0, 0),
+                location=(500, 100),  # xFRF, yFRF
+                coordType='FRF',
+                verbose=False
+            )
+            
+            # Should succeed and convert coordinates
+            assert result is not None
+            assert 'xFRF' in result['location']
+            assert 'yFRF' in result['location']
+            assert result['location']['xFRF'] == 500
+            assert result['location']['yFRF'] == 100
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+    def test_invalid_coord_type(self):
+        """Test that invalid coordType raises error."""
+        from murgtools.getdata.getDataFRF import getArgusPixelIntensity
+
+        with pytest.raises(ValueError, match="Invalid coordType"):
+            getArgusPixelIntensity(
+                DT.datetime(2024, 6, 15, 12, 0, 0),
+                location=(500, 100),
+                coordType='invalid',
+                verbose=False
+            )
+
+    def test_invalid_channel(self):
+        """Test that invalid channel raises error."""
+        from murgtools.getdata.getDataFRF import getArgusPixelIntensity
+
+        with patch('murgtools.getdata.getDataFRF.getArgusImagery') as mock_get_imagery:
+            mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
+            
+            mock_get_imagery.return_value = {
+                'image': mock_image,
+                'time': DT.datetime(2024, 6, 15, 12, 0, 0),
+                'epochtime': 1718452800.0,
+                'imageType': 'timex',
+                'url': 'http://test.com/image.tif',
+            }
+
+            with pytest.raises(ValueError, match="Invalid channel"):
+                getArgusPixelIntensity(
+                    DT.datetime(2024, 6, 15, 12, 0, 0),
+                    location=(150, 200),
+                    coordType='pixel',
+                    channel='invalid',
+                    verbose=False
+                )
+
+    def test_location_as_dict(self):
+        """Test location specification as dictionary."""
+        from murgtools.getdata.getDataFRF import getArgusPixelIntensity
+
+        with patch('murgtools.getdata.getDataFRF.getArgusImagery') as mock_get_imagery:
+            mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
+            mock_image[200, 150, :] = [255, 128, 64]
+            
+            mock_get_imagery.return_value = {
+                'image': mock_image,
+                'time': DT.datetime(2024, 6, 15, 12, 0, 0),
+                'epochtime': 1718452800.0,
+                'imageType': 'timex',
+                'url': 'http://test.com/image.tif',
+            }
+
+            # Test with dict location
+            result = getArgusPixelIntensity(
+                DT.datetime(2024, 6, 15, 12, 0, 0),
+                location={'i': 150, 'j': 200},
+                coordType='pixel',
+                verbose=False
+            )
+
+            assert result is not None
+            np.testing.assert_array_equal(result['intensity'][0], [255, 128, 64])
