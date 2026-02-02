@@ -710,7 +710,7 @@ class TestGetObsGetWaveSpec:
 
         with pytest.warns(UserWarning, match="getWaveSpec is depreciated"):
             with patch.object(obs, 'getWaveData', return_value={'test': 'data'}):
-                result = obs.getWaveSpec()
+                obs.getWaveSpec()
 
     @patch('murgtools.getdata.getDataFRF.nc.date2num')
     def test_getWaveSpec_calls_getWaveData_with_spec_true(self, mock_date2num):
