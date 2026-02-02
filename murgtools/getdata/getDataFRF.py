@@ -3228,7 +3228,7 @@ class getDataTestBed:
             assert np.array(
                 self.wavedataindex).all() != None, 'there''s no data in your time period'
             if np.size(self.wavedataindex) >= 1:
-                wavespec = {'epochtime':   self.ncfile['time'][self.wavedataindex],
+                wavespec = {'epochtime':   self.ncfile['time'][self.ncfileindex],
                             'time':        nc.num2date(self.allEpoch[self.wavedataindex],
                                                        self.ncfile['time'].units,
                                                        only_use_cftime_datetimes=False),
@@ -3239,14 +3239,14 @@ class getDataTestBed:
                             'Hs':          self.ncfile['waveHs'][self.ncfileindex],
                             'peakf':       self.ncfile['waveTp'][self.ncfileindex],
                             'wavedirbin':  self.ncfile['waveDirectionBins'][:],
-                            'dWED':        self.ncfile['directionalWaveEnergyDensity'][self.wavedataindex,
+                            'dWED':        self.ncfile['directionalWaveEnergyDensity'][self.ncfileindex,
                                            :, :],
-                            'waveDm':      self.ncfile['waveDm'][self.wavedataindex],
+                            'waveDm':      self.ncfile['waveDm'][self.ncfileindex],
                             'waveTm':      self.ncfile['waveTm'][self.ncfileindex],
                             'waveTp':      self.ncfile['waveTp'][self.ncfileindex],
-                            'WL':          self.ncfile['waterLevel'][self.wavedataindex],
-                            'qcFlagWL':    self.ncfile['qcFlag'][self.wavedataindex, 2],
-                            'qcFlagWind':  self.ncfile['qcFlag'][self.wavedataindex, 1]}
+                            'WL':          self.ncfile['waterLevel'][self.ncfileindex],
+                            'qcFlagWL':    self.ncfile['qcFlag'][self.ncfileindex, 2],
+                            'qcFlagWind':  self.ncfile['qcFlag'][self.ncfileindex, 1]}
                 wavespec['units'] = {'Hs':self.ncfile['waveHs'].units,
                         'dWED':self.ncfile['directionalWaveEnergyDensity'].units,
                         'waveDm':self.ncfile['waveDm'].units,'waveTm':self.ncfile['waveTm'].units,
@@ -3255,13 +3255,13 @@ class getDataTestBed:
                 wavespec['fspec'] = wavespec['dWED'].sum(axis=2) * np.median(
                     np.diff(np.array(wavespec['wavedirbin'])))
                 if model == 'STWAVE':
-                    wavespec['Umag'] = self.ncfile['Umag'][self.wavedataindex]
-                    wavespec['Udir'] = self.ncfile['Udir'][self.wavedataindex]
+                    wavespec['Umag'] = self.ncfile['Umag'][self.ncfileindex]
+                    wavespec['Udir'] = self.ncfile['Udir'][self.ncfileindex]
                     wavespec['units']['Umag'] = self.ncfile['Umag'].units
                     wavespec['units']['Udir'] = self.ncfile['Udir'].units
                 wavespec['dWED'][wavespec['dWED'] == 0] = 1e-6
                 wavespec['fspec'][wavespec['fspec'] == 0] = 1e-6
-            qcFlags = self.ncfile['qcFlag'][self.wavedataindex]
+            qcFlags = self.ncfile['qcFlag'][self.ncfileindex]
             if removeBadWLFlag is not False:
                 idxGood = np.argwhere(qcFlags[:, 2] <= 5).squeeze()
                 wavespec = sb.reduceDict(wavespec, idxGood)
