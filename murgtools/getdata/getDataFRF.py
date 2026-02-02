@@ -3238,12 +3238,12 @@ class getDataTestBed:
                             'wavedirbin':  self.ncfile['waveDirectionBins'][:],
                             'dWED':        self.ncfile['directionalWaveEnergyDensity'][self.ncfileindex,
                                            :, :],
-                            'waveDm':      self.ncfile['waveDm'][self.wavedataindex],
+                            'waveDm':      self.ncfile['waveDm'][self.ncfileindex],
                             'waveTm':      self.ncfile['waveTm'][self.ncfileindex],
                             'waveTp':      self.ncfile['waveTp'][self.ncfileindex],
-                            'WL':          self.ncfile['waterLevel'][self.wavedataindex],
-                            'qcFlagWL':    self.ncfile['qcFlag'][self.wavedataindex, 2],
-                            'qcFlagWind':  self.ncfile['qcFlag'][self.wavedataindex, 1]}
+                            'WL':          self.ncfile['waterLevel'][self.ncfileindex],
+                            'qcFlagWL':    self.ncfile['qcFlag'][self.ncfileindex, 2],
+                            'qcFlagWind':  self.ncfile['qcFlag'][self.ncfileindex, 1]}
                 wavespec['units'] = {'Hs':self.ncfile['waveHs'].units,
                         'dWED':self.ncfile['directionalWaveEnergyDensity'].units,
                         'waveDm':self.ncfile['waveDm'].units,'waveTm':self.ncfile['waveTm'].units,
