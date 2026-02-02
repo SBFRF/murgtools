@@ -212,12 +212,12 @@ class getObs:
     def __init__(self, d1, d2, **kwargs):
         """Data are returned in self.dataindex are inclusive at start, exclusive at end."""
         # this is active wave gauge list for looping through as needed
-        self.waveGaugeList = ['waverider-26m', 'waverider-17m', 'waverider-20m-1d', 'awac-11m',
+        self.waveGaugeList = ['waverider-26m', 'waverider-17m', 'waverider-17m-1d', 'waverider-20m-1d', 'awac-11m',
                               'awac-jpier-11m', '8m-array', 'awac-6m', 'awac-4.5m', 'adop-3.5m',
                               'xp200m', 'xp150m', 'xp125m', 'sig940-300', 'sig769-300',
                               'sig940-400', 'sig940-600']
 
-        self.directionalWaveGaugeList = ['waverider-26m', 'waverider-17m', 'waverider-20m-1d',
+        self.directionalWaveGaugeList = ['waverider-26m', 'waverider-17m', 'waverider-17m-1d', 'waverider-20m-1d',
                                          'awac-11m', 'awac-jpier-11m', '8m-array',
                                          'awac-6m', 'awac-4.5m', 'adop-3.5m']
 
@@ -1354,7 +1354,7 @@ class getObs:
             self.dataloc = 'oceanography/waves/awac-jpier-11m/awac-jpier-11m.ncml'
         # New waveriders
         elif str(gaugenumber).lower() in ['waverider-17m-1d', '17m-1d']:
-            self.dataloc = 'oceanography/waves/waverider-17m-1D/waverider-17m-1D.ncml'
+            self.dataloc = 'oceanography/waves/waverider-17m-1d/waverider-17m-1d.ncml'
         elif str(gaugenumber).lower() in ['waverider-20m', 'waverider-20m-1d', '20m', '20m-1d']:
             self.dataloc = 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'
         # Paros pressure sensors - support both naming conventions
