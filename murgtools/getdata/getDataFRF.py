@@ -942,7 +942,7 @@ class getObs:
                                            dtRound=1 * 60, epoch1=self.epochd1, epoch2=self.epochd2)
         try:
             self.bathydataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
-                                          epochEnd=self.epochd2, indexRef=indexRef[0] if indexRef else 0)
+                                          epochEnd=self.epochd2, indexRef=indexRef[0] if indexRef is not None else 0)
         except IOError:  # when data are not on CHL thredds
             self.bathydataindex = None
         # returning None object is convention and must be followed/handled down the line
