@@ -16,29 +16,31 @@ When the server started providing GeoTIFFs that were already in lon/lat:
 
 ## Solution
 
-Added automatic coordinate system detection in `examples/test_wave_and_imagery.py`:
+Added automatic coordinate system detection using the `detect_argus_coordinate_system()` utility function in `examples/test_wave_and_imagery.py`:
 
 ```python
+from murgtools.getdata import detect_argus_coordinate_system
+
 # Extract extent from the GeoTIFF
 extent = get_geotiff_extent(tmp_path)
 
-# Detect coordinate system based on value ranges
-left, right, bottom, top = extent
+# Detect coordinate system and convert if needed
+coord_system = detect_argus_coordinate_system(extent)
 
-# Check if values are in State Plane range (Easting > 800000, Northing > 200000)
-if left > 800000 and bottom > 200000:
-    # Extent is in State Plane - convert to lat/lon
+if coord_system == 'state_plane':
+    # Convert State Plane corners to lat/lon
+    left, right, bottom, top = extent
     ll_corner = gp.FRFcoord(left, bottom, coordType='ncsp')
     ur_corner = gp.FRFcoord(right, top, coordType='ncsp')
     argus_extent = [ll_corner['Lon'], ur_corner['Lon'], ll_corner['Lat'], ur_corner['Lat']]
 else:
-    # Extent is already in lon/lat - use directly
+    # Already in lon/lat - use directly
     argus_extent = extent
 ```
 
 ### Detection Logic
 
-The fix uses a simple heuristic based on the magnitude of coordinate values:
+The fix uses the `detect_argus_coordinate_system()` utility function which implements a simple heuristic based on the magnitude of coordinate values:
 
 - **State Plane coordinates** for the FRF area:
   - Easting: ~900,000 - 910,000 meters
@@ -48,7 +50,11 @@ The fix uses a simple heuristic based on the magnitude of coordinate values:
   - Longitude: -76 to -75 degrees
   - Latitude: 36.1 to 36.2 degrees
 
-If `left > 800000 AND bottom > 200000`, the coordinates are classified as State Plane and converted. Otherwise, they're used directly as lon/lat.
+The detection requires BOTH conditions to be true for State Plane classification:
+- `left > 800000` (Easting threshold)
+- `bottom > 200000` (Northing threshold)
+
+If both conditions are met, the coordinates are classified as State Plane and converted. Otherwise, they're used directly as lon/lat.
 
 ## Files Changed
 

@@ -90,10 +90,15 @@ def test_coordinate_detection_edge_cases():
     coord_system2 = detect_argus_coordinate_system(extent2)
     assert coord_system2 == 'lonlat', "Negative values should be detected as lon/lat"
     
-    # Edge case 3: Mixed values (one coordinate is State Plane-like but not both)
-    extent3 = [900000, 901000, 36.17, 36.19]  # Easting looks like SP, but Northing doesn't
+    # Edge case 3: Mixed values - Easting looks like State Plane but Northing doesn't
+    extent3 = [900000, 901000, 36.17, 36.19]
     coord_system3 = detect_argus_coordinate_system(extent3)
-    assert coord_system3 == 'lonlat', "Mixed coordinates should be detected as lon/lat"
+    assert coord_system3 == 'lonlat', "Mixed coordinates (high E, low N) should be detected as lon/lat"
+    
+    # Edge case 4: Mixed values - Northing looks like State Plane but Easting doesn't
+    extent4 = [100, 200, 300000, 301000]
+    coord_system4 = detect_argus_coordinate_system(extent4)
+    assert coord_system4 == 'lonlat', "Mixed coordinates (low E, high N) should be detected as lon/lat"
 
 
 if __name__ == '__main__':
