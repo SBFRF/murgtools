@@ -3684,6 +3684,12 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
     if isinstance(times, DT.datetime):
         times = [times]
 
+    # Initialize variables to avoid UnboundLocalError
+    pixel_i = None
+    pixel_j = None
+    xFRF = None
+    yFRF = None
+
     # Parse location based on coordType
     if isinstance(location, dict):
         if coordType.lower() == 'pixel':
@@ -3854,11 +3860,12 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
         return None
 
     # Build location info dictionary
+    # pixel_i and pixel_j are guaranteed to be set because we found at least one valid image
     location_info = {
         'pixel_i': pixel_i,
         'pixel_j': pixel_j,
     }
-    if coordType.lower() != 'pixel':
+    if coordType.lower() != 'pixel' and xFRF is not None and yFRF is not None:
         location_info['xFRF'] = xFRF
         location_info['yFRF'] = yFRF
 

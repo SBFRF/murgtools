@@ -1077,11 +1077,15 @@ class TestGetArgusPixelIntensity:
 
     @patch('murgtools.getdata.getDataFRF.getArgusImagery')
     def test_out_of_bounds_pixel(self, mock_get_imagery):
-        """Test handling of out-of-bounds pixel coordinates."""
+        """Test handling of out-of-bounds pixel coordinates.
+
+        When pixel coordinates are out of bounds, the function should return None
+        since all requested times resulted in out-of-bounds coordinates.
+        """
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
 
         mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
-        
+
         mock_get_imagery.return_value = {
             'image': mock_image,
             'time': DT.datetime(2024, 6, 15, 12, 0, 0),
@@ -1090,29 +1094,36 @@ class TestGetArgusPixelIntensity:
             'url': 'http://test.com/image.tif',
         }
 
-        # Pixel coordinates out of bounds (image is 1500x1000)
+        # Pixel coordinates out of bounds (image width is 1500, so i=2000 is invalid)
         result = getArgusPixelIntensity(
             DT.datetime(2024, 6, 15, 12, 0, 0),
-            location=(2000, 200),  # x out of bounds
+            location=(2000, 200),  # i out of bounds (> 1500)
             coordType='pixel',
             verbose=False
         )
 
-        assert result is None or len(result['missing_times']) == 1
+        # Should return None because the only time has out-of-bounds coordinates
+        assert result is None
 
     @patch('requests.get')
     @patch('murgtools.getdata.getDataFRF.getArgusImagery')
     @patch('murgtools.utils.geoprocess.FRF2ncsp')
     def test_frf_coordinates(self, mock_frf2ncsp, mock_get_imagery, mock_requests_get):
-        """Test extraction using FRF coordinates."""
+        """Test extraction using FRF coordinates.
+
+        This test verifies that FRF local coordinates (xFRF, yFRF) are correctly
+        converted to pixel coordinates via State Plane coordinates. The test uses
+        realistic FRF coordinates and sets up a GeoTIFF with appropriate georeferencing
+        tags to enable accurate coordinate transformation.
+        """
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
         import tempfile
         import tifffile
-        
+
         # Create a minimal valid GeoTIFF
         mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
         mock_image[200, 150, :] = [255, 128, 64]
-        
+
         mock_get_imagery.return_value = {
             'image': mock_image,
             'time': DT.datetime(2024, 6, 15, 12, 0, 0),
@@ -1120,34 +1131,34 @@ class TestGetArgusPixelIntensity:
             'imageType': 'timex',
             'url': 'http://test.com/image.tif',
         }
-        
+
         # Mock FRF to state plane conversion
-        # This will give state plane coordinates: (902000.0, 274500.0)
+        # FRF (500, 100) -> State Plane (902000.0, 274500.0)
         mock_frf2ncsp.return_value = {
             'StateplaneE': 902000.0,
             'StateplaneN': 274500.0,
         }
-        
+
         # Create a mock GeoTIFF file with proper tags
         with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
             tmp_path = tmp.name
             # Create GeoTIFF with tags using extratags parameter
             # ModelTiepointTag: (pixel_i, pixel_j, 0, world_x, world_y, 0)
-            # Let's set it so pixel (0, 0) is at state plane (900500.0, 276000.0)
-            # and pixel (150, 200) should be at approximately (902000.0, 274000.0)
-            # with scale_x=10, scale_y=-10
-            # Then: world_x = 900500 + 150*10 = 902000 ✓
-            #       world_y = 276000 + 200*(-10) = 274000 (close to 274500)
+            # Pixel (0, 0) is at State Plane (900500.0, 276000.0)
+            # With scale_x=10, scale_y=-10 (negative for typical GeoTIFF y-axis)
+            # Then pixel (150, 200) maps to:
+            #   world_x = 900500 + 150*10 = 902000 (matches our test location)
+            #   world_y = 276000 + 200*(-10) = 274000 (close to our test location)
             tiepoint = [0.0, 0.0, 0.0, 900500.0, 276000.0, 0.0]
             # ModelPixelScaleTag: (scale_x, scale_y, scale_z)
             # scale_y is negative in GeoTIFF (y decreases as row increases)
             scale = [10.0, -10.0, 0.0]  # 10 meters per pixel
-            
+
             extratags = [
                 (33922, 'd', 6, tiepoint, True),  # ModelTiepointTag
                 (33550, 'd', 3, scale, True),     # ModelPixelScaleTag
             ]
-            
+
             tifffile.imwrite(tmp_path, mock_image, extratags=extratags)
         
         try:
