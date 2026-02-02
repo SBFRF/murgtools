@@ -15,10 +15,16 @@ def main():
     image_type = 'bright'
     print("Searching for latest Argus bright image...")
 
+    # Get local time for reference and UTC time for API call
+    local_time = DT.datetime.now()
+    utc_time = DT.datetime.utcnow()
+    print(f"Local time: {local_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"UTC time: {utc_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
     # Use method=1 (backward search) to find the most recent available image
     # search_window_hours=48 gives a 2-day window to find imagery
     result = findArgusImagery(
-        dateOfInterest=DT.datetime.now(),
+        dateOfInterest=utc_time,
         filename=output_file,
         imageType= image_type,
         search_window_hours=48,
