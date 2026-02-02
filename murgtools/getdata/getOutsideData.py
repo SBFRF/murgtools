@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """Module for retrieving data that are not hosted by the FRF."""
 import datetime as DT
-import netCDF4 as nc
 import os
 import re
-import numpy as np
 import sys
+
+import netCDF4 as nc
+import numpy as np
+from pyproj import Transformer
 
 from murgtools import config
 from pyproj import Transformer
