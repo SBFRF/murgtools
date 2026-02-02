@@ -20,7 +20,7 @@ import pandas as pd
 
 from murgtools.utils import geoprocess as gp, sblib as sb
 from murgtools import config
-from murgtools.exceptions import InvalidGaugeError, DataNotFoundError, InvalidParameterError
+from murgtools.exceptions import InvalidGaugeError
 
 def gettime(allEpoch, epochStart, epochEnd, indexRef=0):
     """This function opens the netcdf file, and retrieves time.
