@@ -491,7 +491,7 @@ class TestGetObsGetWind:
         d2 = DT.datetime(2020, 1, 2)
 
         from murgtools.getdata.getDataFRF import getObs
-        obs = getObs(d1, d2)
+        getObs(d1, d2)
 
         # Test gauge selection by checking dataloc would be set correctly
         gauge_mappings = {
@@ -673,7 +673,7 @@ class TestGetObsGetCurrents:
         d2 = DT.datetime(2020, 1, 2)
 
         from murgtools.getdata.getDataFRF import getObs
-        obs = getObs(d1, d2)
+        getObs(d1, d2)
 
         valid_gauges = ['awac-11m', 'awac-8m', 'awac-6m', 'awac-4.5m', 'adop-3.5m']
         for gauge in valid_gauges:
@@ -710,7 +710,7 @@ class TestGetObsGetWaveSpec:
 
         with pytest.warns(UserWarning, match="getWaveSpec is depreciated"):
             with patch.object(obs, 'getWaveData', return_value={'test': 'data'}):
-                result = obs.getWaveSpec()
+                obs.getWaveSpec()
 
     @patch('murgtools.getdata.getDataFRF.nc.date2num')
     def test_getWaveSpec_calls_getWaveData_with_spec_true(self, mock_date2num):
@@ -789,8 +789,10 @@ class TestNewGaugeURLLookups:
         obs = getObs(d1, d2)
 
         waverider_gauges = [
-            ('waverider-17m-1d', 'oceanography/waves/waverider-17m-1D/waverider-17m-1D.ncml'),
-            ('17m-1d', 'oceanography/waves/waverider-17m-1D/waverider-17m-1D.ncml'),
+            ('waverider-17m-1d', 'oceanography/waves/waverider-17m-1d/waverider-17m-1d.ncml'),
+            ('waverider-17m-1D', 'oceanography/waves/waverider-17m-1d/waverider-17m-1d.ncml'),
+            ('17m-1d', 'oceanography/waves/waverider-17m-1d/waverider-17m-1d.ncml'),
+            ('17m-1D', 'oceanography/waves/waverider-17m-1d/waverider-17m-1d.ncml'),
             ('waverider-20m', 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'),
             ('waverider-20m-1d', 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'),
             ('20m', 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'),
@@ -859,7 +861,7 @@ class TestNewGaugeURLLookups:
         obs = getObs(d1, d2)
 
         new_wave_gauges = [
-            'waverider-20m-1d', 'awac-jpier-11m',
+            'waverider-17m-1d', 'waverider-20m-1d', 'awac-jpier-11m',
             'sig940-300', 'sig769-300', 'sig940-400', 'sig940-600'
         ]
         for gauge in new_wave_gauges:
@@ -876,7 +878,7 @@ class TestNewGaugeURLLookups:
         obs = getObs(d1, d2)
 
         # Waveriders and AWACs provide directional data
-        directional_gauges = ['waverider-20m-1d', 'awac-jpier-11m']
+        directional_gauges = ['waverider-17m-1d', 'waverider-20m-1d', 'awac-jpier-11m']
         for gauge in directional_gauges:
             assert gauge in obs.directionalWaveGaugeList, \
                 f"{gauge} should be in directionalWaveGaugeList"

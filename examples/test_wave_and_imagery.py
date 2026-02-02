@@ -27,7 +27,7 @@ def main():
     # Initialize the observation data retriever
     obs = getObs(d1, d2)
 
-    # All available wave gauges
+    # Wave gauges with recent data (others may have historical data only)
     gauge_list = [
         'waverider-26m',
         'waverider-17m',
@@ -43,6 +43,9 @@ def main():
         'sig940-400',
         'sig940-600',
         'sig769-300',
+        'lidarwavegauge140',
+        'lidarwavegauge110',
+        'lidarwavegauge100',
     ]
 
     # Retrieve wave data from all gauges

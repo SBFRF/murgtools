@@ -20,7 +20,7 @@ import pandas as pd
 
 from murgtools.utils import geoprocess as gp, sblib as sb
 from murgtools import config
-from murgtools.exceptions import InvalidGaugeError, DataNotFoundError, InvalidParameterError
+from murgtools.exceptions import InvalidGaugeError
 
 def gettime(allEpoch, epochStart, epochEnd, indexRef=0):
     """This function opens the netcdf file, and retrieves time.
@@ -212,17 +212,17 @@ class getObs:
     def __init__(self, d1, d2, **kwargs):
         """Data are returned in self.dataindex are inclusive at start, exclusive at end."""
         # this is active wave gauge list for looping through as needed
-        self.waveGaugeList = ['waverider-26m', 'waverider-17m', 'waverider-20m-1d', 'awac-11m',
+        self.waveGaugeList = ['waverider-26m', 'waverider-17m', 'waverider-17m-1d', 'waverider-20m-1d', 'awac-11m',
                               'awac-jpier-11m', '8m-array', 'awac-6m', 'awac-4.5m', 'adop-3.5m',
                               'xp200m', 'xp150m', 'xp125m', 'sig940-300', 'sig769-300',
                               'sig940-400', 'sig940-600']
 
-        self.directionalWaveGaugeList = ['waverider-26m', 'waverider-17m', 'waverider-20m-1d',
+        self.directionalWaveGaugeList = ['waverider-26m', 'waverider-17m', 'waverider-17m-1d', 'waverider-20m-1d',
                                          'awac-11m', 'awac-jpier-11m', '8m-array',
                                          'awac-6m', 'awac-4.5m', 'adop-3.5m']
 
-        self.currentsGaugeList = ['awac-11m', 'awac-jpier-11m', 'awac-6m', 'awac-4.5m', 'adop-3.5m',
-                                  'sig769-300', 'sig940-300', 'sig940-400', 'sig940-600']
+        self.currentsGaugeList = ['awac-11m', 'awac-jpier-11m', 'awac-6m', 'awac-5m', 'awac-4.5m',
+                                  'adop-3.5m', 'sig769-300', 'sig940-300', 'sig940-400', 'sig940-600']
         #self.rawdataloc_wave = []
         #self.outputdir = []  # location for outputfiles
         self.d1 = d1  # start date for data grab
@@ -319,7 +319,7 @@ class getObs:
         try:
             self.wavedataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
                                          epochEnd=self.epochd2)
-            if self.wavedataindex is None:
+            if self.wavedataindex is None or np.size(self.wavedataindex) == 0:
                 raise ValueError('there is no data in your time period')
             # Compute absolute index for netCDF file access when getnc() returned a subset
             indexOffset = indexRef[0] if indexRef is not None else 0
@@ -492,6 +492,10 @@ class getObs:
 
             gaugenumber = [6, 'adop-3.5m'] (Default value = 5)
 
+            gaugenumber = ['sig940-300', '940-300']
+
+            gaugenumber = ['sig769-300', '769-300']
+
           roundto: the time over which the wind record exists, ie data is collected in 10 minute
           increments
             data is rounded to the nearst [roundto] (default 1 min)
@@ -528,7 +532,8 @@ class getObs:
         """
         valid_gauges = [2, 3, 4, 5, 6, 'awac-11m', 'awac-8m', 'awac-6m', 'awac-4.5m', 'awac-5m',
                         'adop-3.5m', 'awac-jpier-11m', 'awac-jpier', 'jpier-11m',
-                        'sig769-300', 'sig940-300', 'sig940-400', 'sig940-600']
+                        'sig769-300', '769-300',
+                        'sig940-300', '940-300', 'sig940-400', '940-400', 'sig940-600', '940-600']
         gauge_lower = str(gaugenumber).lower()
         if gauge_lower not in valid_gauges and gaugenumber not in valid_gauges:
             raise InvalidGaugeError(gaugenumber, valid_gauges=valid_gauges)
@@ -545,7 +550,7 @@ class getObs:
             self.dataloc = 'oceanography/currents/awac-5m/awac-5m.ncml'
         elif gaugenumber in [6, 'adop-3.5m']:
             self.dataloc = 'oceanography/currents/adop-3.5m/adop-3.5m.ncml'
-        # AWAC at jetty pier
+        # AWAC at jenttes pier
         elif gauge_lower in ['awac-jpier-11m', 'awac-jpier', 'jpier-11m']:
             self.dataloc = 'oceanography/currents/awac-jpier-11m/awac-jpier-11m.ncml'
         # Nortek Signature profilers
@@ -1349,7 +1354,7 @@ class getObs:
             self.dataloc = 'oceanography/waves/awac-jpier-11m/awac-jpier-11m.ncml'
         # New waveriders
         elif str(gaugenumber).lower() in ['waverider-17m-1d', '17m-1d']:
-            self.dataloc = 'oceanography/waves/waverider-17m-1D/waverider-17m-1D.ncml'
+            self.dataloc = 'oceanography/waves/waverider-17m-1d/waverider-17m-1d.ncml'
         elif str(gaugenumber).lower() in ['waverider-20m', 'waverider-20m-1d', '20m', '20m-1d']:
             self.dataloc = 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'
         # Paros pressure sensors - support both naming conventions
@@ -3217,15 +3222,18 @@ class getDataTestBed:
         # parsing out data of interest in time
 
         self.dataloc = urlFront + '/' + fname
-        self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass, dtRound=1 * 60,server=self.server)
+        self.ncfile, self.allEpoch, indexRef = getnc(dataLoc=self.dataloc, callingClass=self.callingClass, dtRound=1 * 60,server=self.server)
         try:
             # go get indices of interest
             self.wavedataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
                                          epochEnd=self.epochd2)
+            # Compute absolute index for netCDF file access when getnc() returned a subset
+            indexOffset = indexRef[0] if indexRef is not None else 0
+            self.ncfileindex = self.wavedataindex + indexOffset  # absolute index for ncfile access
             assert np.array(
                 self.wavedataindex).all() != None, 'there''s no data in your time period'
             if np.size(self.wavedataindex) >= 1:
-                wavespec = {'epochtime':   self.ncfile['time'][self.wavedataindex],
+                wavespec = {'epochtime':   self.ncfile['time'][self.ncfileindex],
                             'time':        nc.num2date(self.allEpoch[self.wavedataindex],
                                                        self.ncfile['time'].units,
                                                        only_use_cftime_datetimes=False),
@@ -3236,14 +3244,14 @@ class getDataTestBed:
                             'Hs':          self.ncfile['waveHs'][self.ncfileindex],
                             'peakf':       self.ncfile['waveTp'][self.ncfileindex],
                             'wavedirbin':  self.ncfile['waveDirectionBins'][:],
-                            'dWED':        self.ncfile['directionalWaveEnergyDensity'][self.wavedataindex,
+                            'dWED':        self.ncfile['directionalWaveEnergyDensity'][self.ncfileindex,
                                            :, :],
-                            'waveDm':      self.ncfile['waveDm'][self.wavedataindex],
+                            'waveDm':      self.ncfile['waveDm'][self.ncfileindex],
                             'waveTm':      self.ncfile['waveTm'][self.ncfileindex],
                             'waveTp':      self.ncfile['waveTp'][self.ncfileindex],
-                            'WL':          self.ncfile['waterLevel'][self.wavedataindex],
-                            'qcFlagWL':    self.ncfile['qcFlag'][self.wavedataindex, 2],
-                            'qcFlagWind':  self.ncfile['qcFlag'][self.wavedataindex, 1]}
+                            'WL':          self.ncfile['waterLevel'][self.ncfileindex],
+                            'qcFlagWL':    self.ncfile['qcFlag'][self.ncfileindex, 2],
+                            'qcFlagWind':  self.ncfile['qcFlag'][self.ncfileindex, 1]}
                 wavespec['units'] = {'Hs':self.ncfile['waveHs'].units,
                         'dWED':self.ncfile['directionalWaveEnergyDensity'].units,
                         'waveDm':self.ncfile['waveDm'].units,'waveTm':self.ncfile['waveTm'].units,
@@ -3252,13 +3260,13 @@ class getDataTestBed:
                 wavespec['fspec'] = wavespec['dWED'].sum(axis=2) * np.median(
                     np.diff(np.array(wavespec['wavedirbin'])))
                 if model == 'STWAVE':
-                    wavespec['Umag'] = self.ncfile['Umag'][self.wavedataindex]
-                    wavespec['Udir'] = self.ncfile['Udir'][self.wavedataindex]
+                    wavespec['Umag'] = self.ncfile['Umag'][self.ncfileindex]
+                    wavespec['Udir'] = self.ncfile['Udir'][self.ncfileindex]
                     wavespec['units']['Umag'] = self.ncfile['Umag'].units
                     wavespec['units']['Udir'] = self.ncfile['Udir'].units
                 wavespec['dWED'][wavespec['dWED'] == 0] = 1e-6
                 wavespec['fspec'][wavespec['fspec'] == 0] = 1e-6
-            qcFlags = self.ncfile['qcFlag'][self.wavedataindex]
+            qcFlags = self.ncfile['qcFlag'][self.ncfileindex]
             if removeBadWLFlag is not False:
                 idxGood = np.argwhere(qcFlags[:, 2] <= 5).squeeze()
                 wavespec = sb.reduceDict(wavespec, idxGood)
