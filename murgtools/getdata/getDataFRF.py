@@ -3637,7 +3637,7 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
             - 'pixel': Direct pixel indices (i, j)
             - 'FRF': FRF local coordinates (xFRF, yFRF) in meters
             - 'LL' or 'geographic' or 'LatLon': Geographic coordinates (lon, lat)
-            - 'spnc' or 'ncsp': NC State Plane coordinates (easting, northing)
+            - 'spnc' or 'ncsp': NC State Plane coordinates (easting_sp, northing_sp) in meters
             Defaults to 'FRF'.
         imageType (str, optional): Type of Argus image product. Available options:
             - 'timex': Time exposure average (default) - averaged pixel intensities
@@ -3705,8 +3705,8 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
     yFRF = None
     lon = None
     lat = None
-    easting = None
-    northing = None
+    easting_sp = None
+    northing_sp = None
     is_slice = False
 
     # Parse location based on coordType
@@ -3721,8 +3721,8 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
             lon = location.get('lon', location.get('longitude'))
             lat = location.get('lat', location.get('latitude'))
         elif coordType.lower() in ['spnc', 'ncsp']:
-            easting = location.get('easting', location.get('StateplaneE'))
-            northing = location.get('northing', location.get('StateplaneN'))
+            easting_sp = location.get('easting', location.get('StateplaneE'))
+            northing_sp = location.get('northing', location.get('StateplaneN'))
         else:
             raise ValueError(f"Invalid coordType '{coordType}'. Must be one of: "
                            "'pixel', 'FRF', 'LL', 'geographic', 'LatLon', 'spnc', 'ncsp'")
@@ -3742,7 +3742,7 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
             elif coordType.lower() in ['ll', 'geographic', 'latlon']:
                 lon, lat = location
             elif coordType.lower() in ['spnc', 'ncsp']:
-                easting, northing = location
+                easting_sp, northing_sp = location
             else:
                 raise ValueError(f"Invalid coordType '{coordType}'. Must be one of: "
                                "'pixel', 'FRF', 'LL', 'geographic', 'LatLon', 'spnc', 'ncsp'")
@@ -3759,7 +3759,7 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
             xFRF = coords['xFRF']
             yFRF = coords['yFRF']
         elif coordType.lower() in ['spnc', 'ncsp']:
-            coords = gp.FRFcoord(easting, northing, coordType='spnc')
+            coords = gp.FRFcoord(easting_sp, northing_sp, coordType='spnc')
             xFRF = coords['xFRF']
             yFRF = coords['yFRF']
         else:
@@ -3869,12 +3869,10 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
 
         # Handle channel selection
         if channel is not None:
-    # pixel_i and pixel_j are taken from the last valid image processed in the loop
-    location_info = {
-        'pixel_i': pixel_i,
-        'pixel_j': pixel_j,
-        # Record which image time these pixel coordinates correspond to
-        'pixel_coords_reference_time': valid_times[-1],
+            if is_slice:
+                # For slices, apply channel selection across the slice
+                if channel in ['red', 'r', 0]:
+                    intensity = pixel_value[:, :, 0] if pixel_value.ndim == 3 else pixel_value[..., 0]
                 elif channel in ['green', 'g', 1]:
                     intensity = pixel_value[:, :, 1] if pixel_value.ndim == 3 else pixel_value[..., 1]
                 elif channel in ['blue', 'b', 2]:
