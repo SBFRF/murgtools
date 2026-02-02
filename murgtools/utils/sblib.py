@@ -13,6 +13,7 @@ import datetime as DT
 import netCDF4 as nc
 import math, warnings, os
 from dateutil.relativedelta import relativedelta
+from murgtools.exceptions import InvalidParameterError
 
 ########################################
 #  following functions deal with general things
@@ -489,6 +490,59 @@ def roundtime(timeIn=None, roundTo=60):
         else:
             dtlist = dtlist[0]  # if it came in as a single element, return it as such
     return dtlist
+
+
+def roundDatetimeToInterval(dt, interval_minutes=30, method='nearest'):
+    """Round datetime to nearest interval.
+
+    This function is useful for aligning datetimes to regular intervals,
+    such as 30-minute Argus imagery timestamps.
+
+    Args:
+        dt (datetime): datetime to round
+        interval_minutes (int): Interval in minutes (default 30 for Argus)
+        method (str): Rounding method - 'nearest', 'floor', or 'ceil'
+
+    Returns:
+        datetime: Rounded datetime with seconds and microseconds zeroed
+
+    Raises:
+        InvalidParameterError: If method is not one of 'nearest', 'floor', or 'ceil'
+
+    Examples:
+        >>> import datetime as DT
+        >>> dt = DT.datetime(2024, 6, 15, 14, 23, 45)
+        >>> roundDatetimeToInterval(dt, 30)  # nearest
+        datetime.datetime(2024, 6, 15, 14, 30, 0)
+        >>> roundDatetimeToInterval(dt, 30, method='floor')
+        datetime.datetime(2024, 6, 15, 14, 0, 0)
+    """
+    valid_methods = ['nearest', 'floor', 'ceil']
+    if method not in valid_methods:
+        raise InvalidParameterError(
+            f"Invalid rounding method: '{method}'",
+            parameter_name='method',
+            value=method,
+            expected=f"One of {valid_methods}"
+        )
+    
+    total_minutes = dt.hour * 60 + dt.minute
+
+    if method == 'floor':
+        rounded_minutes = (total_minutes // interval_minutes) * interval_minutes
+    elif method == 'ceil':
+        rounded_minutes = -(-total_minutes // interval_minutes) * interval_minutes
+    else:  # nearest
+        rounded_minutes = round(total_minutes / interval_minutes) * interval_minutes
+
+    # Handle overflow past midnight
+    hours, mins = divmod(rounded_minutes, 60)
+    if hours >= 24:
+        dt = dt + DT.timedelta(days=1)
+        hours = 0
+
+    return dt.replace(hour=hours, minute=mins, second=0, microsecond=0)
+
 
 def createDateList(start, end, delta):
     """creates a generator of dates

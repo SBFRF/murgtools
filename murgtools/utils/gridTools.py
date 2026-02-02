@@ -8,6 +8,8 @@ from . import geoprocess as gp
 from . import sblib as sb
 from .anglesLib import geo2STWangle
 import scipy.spatial
+
+from murgtools import config
 # Note: getObs and getDataTestBed imports are done locally in functions that need them
 # to avoid circular imports
 
@@ -235,7 +237,7 @@ def makeTimeMeanBackgroundBathy(dir_loc, dSTR_s=None, dSTR_e=None, scalecDict=No
     from scaleCinterp_python.DEM_generator import DEM_generator
 
     #HARD CODED VARIABLES!!!
-    filelist = ['http://134.164.129.55/thredds/dodsC/FRF/geomorphology/elevationTransects/survey/surveyTransects.ncml']
+    filelist = [config.SURVEY_TRANSECTS_URL]
     # this is just the location of the ncml for the transects!!!!!
 
     nc_b_loc = '/home/david/BathyTroubleshooting/BackgroundFiles'
@@ -247,7 +249,7 @@ def makeTimeMeanBackgroundBathy(dir_loc, dSTR_s=None, dSTR_e=None, scalecDict=No
     # var_yaml = '/home/david/PycharmProjects/makebathyinterp/yamls/BATHY/FRFt0_TimeMean_var.yml'
 
     # CS-array url - I just use this to get the position, not for any other data
-    cs_array_url = 'http://134.164.129.55/thredds/dodsC/FRF/oceanography/waves/8m-array/2017/FRF-ocean_waves_8m-array_201707.nc'
+    cs_array_url = config.WAVE_8M_ARRAY_URL
     # where do I want to save any QA/QC figures
     fig_loc = '/home/david/BathyTroubleshooting/BackgroundFiles/TestFigs'
 

@@ -5,10 +5,12 @@ This is a home brew hack, to explore the thredds server for errors that might ca
 import netCDF4 as nc
 import numpy as np
 
+from murgtools import config
+
 def main():
     """ """
-    baseURL = 'http://134.164.129.55/thredds/dodsC/FRF/'
-    baseURL = 'http://134.164.129.628080/thredds/dodsC/'
+    # Note: Original had a typo in second URL (629.628080). Using config values instead.
+    baseURL = config.THREDDS_FRF_LOCAL_FRF
 
     scienceList = ['CMTB']#['oceanography/']
     disciplineList = ['CB_STWAVE_data/', 'CBHP_STWAVE_data/']

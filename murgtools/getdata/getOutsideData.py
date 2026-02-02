@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 """Module for retrieving data that are not hosted by the FRF."""
 import datetime as DT
-import netCDF4 as nc
 import os
-import numpy as np
+import re
 import sys
+
+import netCDF4 as nc
+import numpy as np
+from pyproj import Transformer
+
+from murgtools import config
 
 class forecastData:
     """A data retrival class situated around gathering forecast data."""
@@ -22,12 +27,12 @@ class forecastData:
         self.rawdataloc_wave = []
         self.outputdir = []  # location for outputfiles
         self.d1 = d1  # start date for data grab
-        self.timeunits = 'seconds since 1970-01-01 00:00:00'
+        self.timeunits = config.TIME_UNITS
         self.epochd1 = nc.date2num(self.d1, self.timeunits)
-        self.dataLocFRF = 'http://134.164.129.55/thredds/dodsC/FRF/'
-        self.dataLocTB = 'http://134.164.129.62:8080/thredds/dodsC/CMTB'
-        self.dataLocCHL = 'https://chlthredds.erdc.dren.mil/thredds/dodsC/frf/' #'http://10.200.23.50/thredds/dodsC/frf/'
-        self.dataLocNCEP = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/wave/prod/'#ftpprd.ncep.noaa.gov/pub/data/nccf/com/wave/prod/multi_1.'
+        self.dataLocFRF = config.THREDDS_FRF_LOCAL_FRF
+        self.dataLocTB = config.THREDDS_TESTBED
+        self.dataLocCHL = config.THREDDS_CHL_ALT
+        self.dataLocNCEP = config.NCEP_DATA_URL
         self.dataLocECWMF = 'ftp://data-portal.ecmwf.int/20170808120000/'  # ECMWF forecasts
         assert type(self.d1) == DT.datetime, 'end need to be in python "Datetime" data types'
 
@@ -312,15 +317,10 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
     rotation_angle = np.degrees(np.arctan2(dy, dx))
 
     # 3. Build STAC search query based on endpoint
-    endpoints = {
-        'element84': 'https://earth-search.aws.element84.com/v1/search',
-        'planetary-computer': 'https://planetarycomputer.microsoft.com/api/stac/v1/search'
-    }
+    if endpoint not in config.STAC_URLS:
+        raise ValueError(f"Unknown endpoint '{endpoint}'. Options: {list(config.STAC_URLS.keys())}")
 
-    if endpoint not in endpoints:
-        raise ValueError(f"Unknown endpoint '{endpoint}'. Options: {list(endpoints.keys())}")
-
-    stac_url = endpoints[endpoint]
+    stac_url = config.STAC_URLS[endpoint]
 
     if date is None:
         date = DT.datetime.now()
@@ -378,7 +378,7 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
 
     # Sign URL if using Planetary Computer (required for asset access)
     if endpoint == 'planetary-computer':
-        sign_url = f"https://planetarycomputer.microsoft.com/api/sas/v1/sign?href={rgb_url}"
+        sign_url = f"{config.PLANETARY_COMPUTER_SIGN_URL}?href={rgb_url}"
         sign_resp = requests.get(sign_url)
         sign_resp.raise_for_status()
         rgb_url = sign_resp.json()['href']
@@ -393,6 +393,47 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
 
     try:
         image = tifffile.imread(tmp_path)
+
+        # Extract actual image extent from GeoTIFF tags and convert to lat/lon
+        # STAC bbox is not reliable for pixel coordinate calculation
+        try:
+            with tifffile.TiffFile(tmp_path) as tif:
+                tags = tif.pages[0].tags
+                tiepoint = tags[33922].value  # (i, j, k, x, y, z) - UTM coordinates
+                scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
+                img_h, img_w = tif.pages[0].shape[:2]
+
+                # UTM bounds
+                utm_left = tiepoint[3]
+                utm_right = tiepoint[3] + img_w * scale[0]
+                utm_top = tiepoint[4]
+                utm_bottom = tiepoint[4] - img_h * scale[1]
+
+                # Determine UTM zone from GeoKey (tag 34737 contains projection info)
+                proj_str = tags.get(34737, None)
+                if proj_str:
+                    proj_str = proj_str.value
+                    # Parse UTM zone from string like "WGS 84 / UTM zone 18N"
+                    match = re.search(r'UTM zone (\d+)([NS])', str(proj_str))
+                    if match:
+                        zone = int(match.group(1))
+                        hemisphere = match.group(2)
+                        epsg = 32600 + zone if hemisphere == 'N' else 32700 + zone
+                    else:
+                        epsg = 32618
+
+                # Convert UTM corners to lat/lon
+                transformer = Transformer.from_crs(f'EPSG:{epsg}', 'EPSG:4326', always_xy=True)
+
+                tl_lon, tl_lat = transformer.transform(utm_left, utm_top)
+                br_lon, br_lat = transformer.transform(utm_right, utm_bottom)
+
+                # scene_bbox in lat/lon: [west, south, east, north]
+                scene_bbox = [tl_lon, br_lat, br_lon, tl_lat]
+        except KeyError:
+            # Missing GeoTIFF georeferencing tags; fall back to STAC bbox if available.
+            if isinstance(item, dict) and 'bbox' in item:
+                scene_bbox = item['bbox']
     finally:
         os.unlink(tmp_path)
 
@@ -400,9 +441,7 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
     if collection == 'naip' and image.ndim == 3 and image.shape[-1] == 4:
         image = image[:, :, :3]  # Keep only RGB, drop NIR
 
-    # 7. Crop to bbox
-    scene_bbox = item['bbox']  # [west, south, east, north]
-
+    # 7. Crop to bbox using actual image extent from GeoTIFF
     h, w = image.shape[:2]
     px_per_deg_x = w / (scene_bbox[2] - scene_bbox[0])
     px_per_deg_y = h / (scene_bbox[3] - scene_bbox[1])

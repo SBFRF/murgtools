@@ -19,6 +19,8 @@ import numpy as np
 import pandas as pd
 
 from murgtools.utils import geoprocess as gp, sblib as sb
+from murgtools import config
+from murgtools.exceptions import InvalidGaugeError
 
 def gettime(allEpoch, epochStart, epochEnd, indexRef=0):
     """This function opens the netcdf file, and retrieves time.
@@ -72,25 +74,11 @@ def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=60, cutrange=100000
     start = kwargs.get('start', None)
     end = kwargs.get('end', None)
     server = kwargs.get('server', None)
-    FRFdataloc = u'http://134.164.129.55:8080/thredds/dodsC/'
-    chlDataLoc = u'https://chldata.erdc.dren.mil/thredds/dodsC/'
     # a list of data sets (just the ncml) that shouldn't drill down to monthly file
     doNotDrillList = ['survey', 'integratedBathyTopo']
 
-    # chose which server to select based on IP
-    try:
-        ipAddress = socket.gethostbyname(socket.gethostname())
-        if (server == 'FRF' or server is None) and (ipAddress.startswith('134.164') or ipAddress.startswith('10.0.0')):  # FRF subdomain
-            THREDDSloc = FRFdataloc
-            pName = u'FRF'
-        elif server in ['CHL', 'chl', None]:
-            THREDDSloc = chlDataLoc
-            pName = u'frf'
-    except:
-        print('Could not aquire socket using CHLdata')
-
-        THREDDSloc = chlDataLoc
-        pName = u'frf'
+    # chose which server to select based on IP using centralized config
+    THREDDSloc, pName = config.get_thredds_server(server=server)
         
     if callingClass == 'getDataTestBed':  # overwrite pName if calling for model data
         pName = u'cmtb'
@@ -152,8 +140,9 @@ def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=60, cutrange=100000
                     indexRef = [idts[res1], idts[res2]]  # define a refined time window to return
                     allEpoch = ncFile['time'][idts[res1]:idts[res2]]
                 else:  # there is no relevant data in my window, take the last "cutrange" of values
-                    indexRef = [-cutrange, len(tt)]
-                    allEpoch = ncFile['time'][-cutrange: len(tt)]
+                    startIdx = max(0, len(tt) - cutrange)  # compute actual positive offset
+                    indexRef = [startIdx, len(tt)]
+                    allEpoch = ncFile['time'][startIdx:]
             finished = True
         except IOError:
             print('Error reading {}, trying again {}/{}'.format(ncfileURL, n + 1, maxTries))
@@ -223,26 +212,28 @@ class getObs:
     def __init__(self, d1, d2, **kwargs):
         """Data are returned in self.dataindex are inclusive at start, exclusive at end."""
         # this is active wave gauge list for looping through as needed
-        self.waveGaugeList = ['waverider-26m', 'waverider-17m', 'awac-11m', '8m-array',
-                              'awac-6m', 'awac-4.5m', 'adop-3.5m', 'xp200m', 'xp150m', 'xp125m',
-                              'sig940-300', 'sig769-300', 'lidarwavegauge140', 'lidarwavegauge110',
-                              'lidarwavegauge100']
+        self.waveGaugeList = ['waverider-26m', 'waverider-17m', 'waverider-20m-1d', 'awac-11m',
+                              'awac-jpier-11m', '8m-array', 'awac-6m', 'awac-4.5m', 'adop-3.5m',
+                              'xp200m', 'xp150m', 'xp125m', 'sig940-300', 'sig769-300',
+                              'sig940-400', 'sig940-600']
 
-        self.directionalWaveGaugeList = ['waverider-26m', 'waverider-17m', 'awac-11m', '8m-array',
-                                         'awac-6m', 'awac-4.5m', 'adop-3.5m', 'sig940-300', 'sig769-300']
-        
-        self.currentsGaugeList = ['awac-11m', 'awac-6m', 'awac-4.5m', 'adop-3.5m', 'sig940-300', 'sig769-300']
+        self.directionalWaveGaugeList = ['waverider-26m', 'waverider-17m', 'waverider-20m-1d',
+                                         'awac-11m', 'awac-jpier-11m', '8m-array',
+                                         'awac-6m', 'awac-4.5m', 'adop-3.5m']
+
+        self.currentsGaugeList = ['awac-11m', 'awac-jpier-11m', 'awac-6m', 'awac-5m', 'awac-4.5m',
+                                  'adop-3.5m', 'sig769-300', 'sig940-300', 'sig940-400', 'sig940-600']
         #self.rawdataloc_wave = []
         #self.outputdir = []  # location for outputfiles
         self.d1 = d1  # start date for data grab
         self.d2 = d2  # end data for data grab
-        self.timeunits = 'seconds since 1970-01-01 00:00:00'
+        self.timeunits = config.TIME_UNITS
         self.epochd1 = nc.date2num(self.d1, self.timeunits)
         self.epochd2 = nc.date2num(self.d2, self.timeunits)
         self.callingClass = 'getObs'
-        self.FRFdataloc = 'http://134.164.129.55/thredds/dodsC/FRF/'
-        self.crunchDataLoc = 'http://134.164.129.55/thredds/dodsC/cmtb/'
-        self.chlDataLoc = 'https://chlthredds.erdc.dren.mil/thredds/dodsC/frf/'  #
+        self.FRFdataloc = config.THREDDS_FRF_LOCAL_FRF
+        self.crunchDataLoc = config.THREDDS_CRUNCH
+        self.chlDataLoc = config.THREDDS_CHL_ALT
         self.server = kwargs.get('server', None)
         self._comp_time()
         # assert type(self.d2) == DT.datetime, 'd1 need to be in python "Datetime" data types'
@@ -322,13 +313,17 @@ class getObs:
         # Making gauges flexible
         self._waveGaugeURLlookup(gaugenumber)
         # parsing out data of interest in time
-        self.ncfile, self.allEpoch, _ = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
+        self.ncfile, self.allEpoch, indexRef = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=roundto * 60, epoch1=self.epochd1, epoch2=self.epochd2,
                                            start=self.d1, end=self.d2, server=self.server)
         try:
             self.wavedataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
                                          epochEnd=self.epochd2)
-            assert self.wavedataindex is not None, 'there\'s no data in your time period'
+            if self.wavedataindex is None or np.size(self.wavedataindex) == 0:
+                raise ValueError('there is no data in your time period')
+            # Compute absolute index for netCDF file access when getnc() returned a subset
+            indexOffset = indexRef[0] if indexRef is not None else 0
+            self.ncfileindex = self.wavedataindex + indexOffset  # absolute index for ncfile access
 
             if np.size(self.wavedataindex) >= 1:
                 # consistant for all wave gauges
@@ -363,12 +358,12 @@ class getObs:
                             'lat':         self.ncfile['latitude'][:],
                             'lon':         self.ncfile['longitude'][:],
                             'depth':       depth,
-                            'Hs':          self.ncfile['waveHs'][self.wavedataindex],
+                            'Hs':          self.ncfile['waveHs'][self.ncfileindex],
                 }
                 if 'waveTp' in self.ncfile.variables.keys():
-                    wavespec['peakf'] = 1 / self.ncfile['waveTp'][self.wavedataindex]
+                    wavespec['peakf'] = 1 / self.ncfile['waveTp'][self.ncfileindex]
                 elif 'peakf' in self.ncfile.variables.keys():
-                    wavespec['peakf'] = self.ncfile['waveTp'][self.wavedataindex]
+                    wavespec['peakf'] = self.ncfile['waveTp'][self.ncfileindex]
                 else:
                     pass
     
@@ -378,11 +373,11 @@ class getObs:
                 try:  # pull time specific data based on self.wavedataindex
                     wavespec['depth'] = self.ncfile['nominalDepth'][:]  # this should always go with directional gauges
                     wavespec['wavedirbin'] = self.ncfile['waveDirectionBins'][:]
-                    wavespec['qcFlagE'] = self.ncfile['qcFlagE'][self.wavedataindex]
-                    wavespec['qcFlagD'] = self.ncfile['qcFlagD'][self.wavedataindex]
+                    wavespec['qcFlagE'] = self.ncfile['qcFlagE'][self.ncfileindex]
+                    wavespec['qcFlagD'] = self.ncfile['qcFlagD'][self.ncfileindex]
                     if spec is True:
-                        wavespec['dWED'] = self.ncfile['directionalWaveEnergyDensity'][self.wavedataindex, :, :]
-                        wavespec['fspec'] = self.ncfile['waveEnergyDensity'][self.wavedataindex, :]
+                        wavespec['dWED'] = self.ncfile['directionalWaveEnergyDensity'][self.ncfileindex, :, :]
+                        wavespec['fspec'] = self.ncfile['waveEnergyDensity'][self.ncfileindex, :]
                         # wavespec['units']['dWED'] = self.ncfile['directionalWaveEnergyDensity'].units
                         # wavespec['units']['fspec'] = self.ncfile['waveEnergyDensity'].units
 
@@ -392,9 +387,9 @@ class getObs:
                             # wavespec['units']['dWED'] = self.ncfile['directionalWaveEnergyDensity'].units
                             # wavespec['units']['fspec'] = self.ncfile['waveEnergyDensity'].units
                     try:
-                        wavespec['waveDp'] = self.ncfile['wavePeakDirectionPeakFrequency'][self.wavedataindex]
-                        wavespec['waveDm'] = self.ncfile['waveMeanDirection'][self.wavedataindex]
-                        wavespec['Tm'] = self.ncfile['waveTm'][self.wavedataindex]
+                        wavespec['waveDp'] = self.ncfile['wavePeakDirectionPeakFrequency'][self.ncfileindex]
+                        wavespec['waveDm'] = self.ncfile['waveMeanDirection'][self.ncfileindex]
+                        wavespec['Tm'] = self.ncfile['waveTm'][self.ncfileindex]
                         wavespec['units']['waveDp'] = self.ncfile['wavePeakDirectionPeakFrequency'].units
                         wavespec['units']['waveDm'] = self.ncfile['waveMeanDirection'].units
                         wavespec['units']['Tm'] = self.ncfile['waveTm'].units
@@ -402,10 +397,10 @@ class getObs:
                         pass
                         
                     if returnAB is True:
-                        wavespec['a1'] = self.ncfile['waveA1Value'][self.wavedataindex, :]
-                        wavespec['a2'] = self.ncfile['waveA2Value'][self.wavedataindex, :]
-                        wavespec['b1'] = self.ncfile['waveB1Value'][self.wavedataindex, :]
-                        wavespec['b2'] = self.ncfile['waveB2Value'][self.wavedataindex, :]
+                        wavespec['a1'] = self.ncfile['waveA1Value'][self.ncfileindex, :]
+                        wavespec['a2'] = self.ncfile['waveA2Value'][self.ncfileindex, :]
+                        wavespec['b1'] = self.ncfile['waveB1Value'][self.ncfileindex, :]
+                        wavespec['b2'] = self.ncfile['waveB2Value'][self.ncfileindex, :]
                 # this should throw when gauge is non directionalWaveGaugeList
                 except IndexError:  # if error its non-directional gauge
                     # lidar guages don't have this variable.
@@ -418,9 +413,9 @@ class getObs:
                     wavespec['wavedirbin'] = np.arange(0, 360, 90)  # 90 degree bins
                     wavespec['waveDp'] = np.ones_like(self.wavedataindex) * -999
                     try:
-                        wavespec['fspec'] = self.ncfile['waveEnergyDensity'][self.wavedataindex, :]
+                        wavespec['fspec'] = self.ncfile['waveEnergyDensity'][self.ncfileindex, :]
                     except(RuntimeError):  # handle n-1 index error with Thredds
-                        wavespec['fspec'] = self.ncfile['waveEnergyDensity'][self.wavedataindex[:-1], :]
+                        wavespec['fspec'] = self.ncfile['waveEnergyDensity'][self.ncfileindex[:-1], :]
                         wavespec['fspec'] = np.append(wavespec['fspec'],
                                                       self.ncfile['waveEnergyDensity'][
                                                       self.wavedataindex[-1], :][
@@ -434,10 +429,10 @@ class getObs:
                     wavespec['dWED'] = wavespec['dWED']*wavespec['fspec'][:, :, np.newaxis]/len(wavespec['wavedirbin'])
                     if 'qcFlagE' in self.ncfile.variables.keys():
                         # lidar wave gauges don't have this variable.
-                        wavespec['qcFlagE'] = self.ncfile['qcFlagE'][self.wavedataindex]
+                        wavespec['qcFlagE'] = self.ncfile['qcFlagE'][self.ncfileindex]
                     else:
                         # lidar wave gauges have waterLevelQCFlag and spectralQCFlag
-                        wavespec['qcFlagE'] = self.ncfile['waterLevelQCFlag'][self.wavedataindex]
+                        wavespec['qcFlagE'] = self.ncfile['waterLevelQCFlag'][self.ncfileindex]
                 if removeBadDataFlag is not False:
                     # Energy should not be needed
                     try:
@@ -535,33 +530,40 @@ class getObs:
                 'meanP' (array): mean pressure
 
         """
-        assert str(gaugenumber).lower() in ['2', '3', '4', '5', '6', 'awac-11m', 'awac-8m', 'awac-6m', 'awac-4.5m',
-                                       'adop-3.5m', 'sig940-300', '940-300', 'sig769-300', '769-300'], \
-                                       'Input string/number is not a valid gage name/number'
+        valid_gauges = [2, 3, 4, 5, 6, 'awac-11m', 'awac-8m', 'awac-6m', 'awac-4.5m', 'awac-5m',
+                        'adop-3.5m', 'awac-jpier-11m', 'awac-jpier', 'jpier-11m',
+                        'sig769-300', '769-300',
+                        'sig940-300', '940-300', 'sig940-400', '940-400', 'sig940-600', '940-600']
+        gauge_lower = str(gaugenumber).lower()
+        if gauge_lower not in valid_gauges and gaugenumber not in valid_gauges:
+            raise InvalidGaugeError(gaugenumber, valid_gauges=valid_gauges)
 
-        if str(gaugenumber).lower() in ['2', 'awac-11m']:
-            # gname = 'AWAC04 - 11m'
+        if gaugenumber in [2, 'awac-11m']:
             self.dataloc = 'oceanography/currents/awac-11m/awac-11m.ncml'
-        elif str(gaugenumber).lower() in ['3', 'awac-8m']:
-            # gname = 'AWAC 8m'
+        elif gaugenumber in [3, 'awac-8m']:
             self.dataloc = 'oceanography/currents/awac-8m/awac-8m.ncml'
-        elif str(gaugenumber).lower() in ['4', 'awac-6m']:
-            # gname = 'AWAC 6m'
+        elif gaugenumber in [4, 'awac-6m']:
             self.dataloc = 'oceanography/currents/awac-6m/awac-6m.ncml'
-        elif str(gaugenumber).lower() in ['5', 'awac-4.5m']:
-            # gname = 'AWAC 4.5m'
+        elif gaugenumber in [5, 'awac-4.5m']:
             self.dataloc = 'oceanography/currents/awac-4.5m/awac-4.5m.ncml'
-        elif str(gaugenumber).lower() in ['6', 'adop-3.5m']:
-            # gname = 'Aquadopp 3.5m'
+        elif gauge_lower == 'awac-5m':
+            self.dataloc = 'oceanography/currents/awac-5m/awac-5m.ncml'
+        elif gaugenumber in [6, 'adop-3.5m']:
             self.dataloc = 'oceanography/currents/adop-3.5m/adop-3.5m.ncml'
-        elif str(gaugenumber).lower() in ['sig940-300', '940-300']:
-            # Signature at yFRF 940, xFRF 300
-            self.dataloc = 'oceanography/currents/sig940-300/sig940-300.ncml'
-        elif str(gaugenumber).lower() in ['sig769-300', '769-300']:
-            # Signature at yFRF 769, xFRF 300
+        # AWAC at jenttes pier
+        elif gauge_lower in ['awac-jpier-11m', 'awac-jpier', 'jpier-11m']:
+            self.dataloc = 'oceanography/currents/awac-jpier-11m/awac-jpier-11m.ncml'
+        # Nortek Signature profilers
+        elif gauge_lower in ['sig769-300', '769-300']:
             self.dataloc = 'oceanography/currents/sig769-300/sig769-300.ncml'
+        elif gauge_lower in ['sig940-300', '940-300']:
+            self.dataloc = 'oceanography/currents/sig940-300/sig940-300.ncml'
+        elif gauge_lower in ['sig940-400', '940-400']:
+            self.dataloc = 'oceanography/currents/sig940-400/sig940-400.ncml'
+        elif gauge_lower in ['sig940-600', '940-600']:
+            self.dataloc = 'oceanography/currents/sig940-600/sig940-600.ncml'
         else:
-            raise NameError('Check gauge name')
+            raise InvalidGaugeError(gaugenumber, valid_gauges=valid_gauges)
         
         self.ncfile, self.allEpoch, _= getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=roundto * 60)  # start=self.d1, end=self.d2) <
@@ -679,7 +681,8 @@ class getObs:
             gname = '732 wind gauge'
             self.dataloc = 'meteorology/wind/D732/D732.ncml'
         else:
-            raise NameError('Specifiy proper Gauge number')
+            valid_gauges = [0, 1, 2, 3, 'derived', 'Derived']
+            raise InvalidGaugeError(gaugenumber, valid_gauges=valid_gauges)
         
         self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=collectionlength * 60, start=self.d1, end=self.d2,
@@ -1342,10 +1345,23 @@ class getObs:
             self.dataloc = 'oceanography/waves/sig940-300/sig940-300.ncml'
         elif str(gaugenumber).lower() in ['sig769-300', '769-300']:
             self.dataloc = 'oceanography/waves/sig769-300/sig769-300.ncml'
-        elif str(gaugenumber).lower() in ['paros-200-940m']:
-            self.dataloc = 'oceanography/waves/paros-200-940m/paros-200-940m.ncml'
-        elif str(gaugenumber).lower() in ['paros-250-940m']:
-            self.dataloc = 'oceanography/waves/paros-250-940m/paros-250-940m.ncml'
+        elif str(gaugenumber).lower() in ['sig940-400', '940-400']:
+            self.dataloc = 'oceanography/waves/sig940-400/sig940-400.ncml'
+        elif str(gaugenumber).lower() in ['sig940-600', '940-600']:
+            self.dataloc = 'oceanography/waves/sig940-600/sig940-600.ncml'
+        # AWAC at jetty pier
+        elif str(gaugenumber).lower() in ['awac-jpier-11m', 'awac-jpier', 'jpier-11m']:
+            self.dataloc = 'oceanography/waves/awac-jpier-11m/awac-jpier-11m.ncml'
+        # New waveriders
+        elif str(gaugenumber).lower() in ['waverider-17m-1d', '17m-1d']:
+            self.dataloc = 'oceanography/waves/waverider-17m-1D/waverider-17m-1D.ncml'
+        elif str(gaugenumber).lower() in ['waverider-20m', 'waverider-20m-1d', '20m', '20m-1d']:
+            self.dataloc = 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'
+        # Paros pressure sensors - support both naming conventions
+        elif str(gaugenumber).lower() in ['paros-200-940m', 'paros940-200']:
+            self.dataloc = 'oceanography/waves/paros940-200/paros940-200.ncml'
+        elif str(gaugenumber).lower() in ['paros-250-940m', 'paros940-250']:
+            self.dataloc = 'oceanography/waves/paros940-250/paros940-250.ncml'
         elif str(gaugenumber).lower() in ['paros-340x-940y-top']:
             self.dataloc = 'oceanography/waves/paros-340x-940y-top/paros-340x-940y-top.ncml'
         # lidar wave gauges - 140 m
@@ -1384,8 +1400,8 @@ class getObs:
 
         else:
             self.gname = 'There Are no Gauge numbers here'
-            raise NameError('Bad Gauge name, specify proper gauge name/number, or add capability')
-    
+            raise InvalidGaugeError(gaugenumber, message='Bad gauge name. See getWaveGaugeLoc for valid options.')
+
     def _wlGageURLlookup(self, gaugenumber):
         """A lookup table function that sets the URL backend for getGageWL.
         
@@ -1442,7 +1458,7 @@ class getObs:
             self.dataloc = 'oceanography/waves/8m-array/8m-array.ncml'
         else:
             self.gname = 'There Are no Gauge numbers here'
-            raise NameError('Bad Gauge name, specify proper gauge name/number')
+            raise InvalidGaugeError(gaugenumber, message='Bad gauge name. See _wlGageURLlookup for valid options.')
     
     def getBathyDuckLoc(self, gaugenumber):
         """This function pulls the stateplane location (if desired) from the survey.
@@ -2432,22 +2448,15 @@ class getDataTestBed:
         self.outputdir = []  # location for outputfiles
         self.start = d1  # start date for data grab
         self.end = d2  # end data for data grab
-        self.timeunits = 'seconds since 1970-01-01 00:00:00'
+        self.timeunits = config.TIME_UNITS
         self.epochd1 = nc.date2num(self.start, self.timeunits)
         self.epochd2 = nc.date2num(self.end, self.timeunits)
         self.comp_time()
-        # if THREDDS is None:
-        #     ipAddress = socket.gethostbyname(socket.gethostname())
-        #     if ipAddress.startswith('134.164.129'):  # FRF subdomain
-        #         self.THREDDS = 'FRF'
-        #     else:
-        #         self.THREDDS = 'CHL'
-        #
         self.server = kwargs.get('server', None)
         self.callingClass = 'getDataTestBed'
-        self.FRFdataloc = u'http://134.164.129.55:8080/thredds/dodsC/FRF/'
-        self.crunchDataLoc = u'http://134.164.129.55:8080/thredds/dodsC/cmtb/'
-        self.chlDataLoc = u'https://chlthredds.erdc.dren.mil/thredds/dodsC/frf/'
+        self.FRFdataloc = config.THREDDS_FRF_LOCAL + 'FRF/'
+        self.crunchDataLoc = config.THREDDS_CRUNCH
+        self.chlDataLoc = config.THREDDS_CHL_ALT
         
         assert type(self.end) == DT.datetime, 'end dates need to be in python "Datetime" data types'
         assert type(
@@ -3209,19 +3218,22 @@ class getDataTestBed:
             fname = 'xp100m/xp100m.ncml'
         else:
             gname = 'There Are no Gauge numbers here'
-            raise NameError('Bad Gauge name, specify proper gauge name/number')
+            raise InvalidGaugeError(gaugenumber, message='Bad gauge name. See _wlGageURLlookup for valid options.')
         # parsing out data of interest in time
 
         self.dataloc = urlFront + '/' + fname
-        self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass, dtRound=1 * 60,server=self.server)
+        self.ncfile, self.allEpoch, indexRef = getnc(dataLoc=self.dataloc, callingClass=self.callingClass, dtRound=1 * 60,server=self.server)
         try:
             # go get indices of interest
             self.wavedataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
                                          epochEnd=self.epochd2)
+            # Compute absolute index for netCDF file access when getnc() returned a subset
+            indexOffset = indexRef[0] if indexRef is not None else 0
+            self.ncfileindex = self.wavedataindex + indexOffset  # absolute index for ncfile access
             assert np.array(
                 self.wavedataindex).all() != None, 'there''s no data in your time period'
             if np.size(self.wavedataindex) >= 1:
-                wavespec = {'epochtime':   self.ncfile['time'][self.wavedataindex],
+                wavespec = {'epochtime':   self.ncfile['time'][self.ncfileindex],
                             'time':        nc.num2date(self.allEpoch[self.wavedataindex],
                                                        self.ncfile['time'].units,
                                                        only_use_cftime_datetimes=False),
@@ -3229,17 +3241,17 @@ class getDataTestBed:
                             'wavefreqbin': self.ncfile['waveFrequency'][:],
                             # 'lat': self.ncfile['lat'][:],
                             # 'lon': self.ncfile['lon'][:],
-                            'Hs':          self.ncfile['waveHs'][self.wavedataindex],
-                            'peakf':       self.ncfile['waveTp'][self.wavedataindex],
+                            'Hs':          self.ncfile['waveHs'][self.ncfileindex],
+                            'peakf':       self.ncfile['waveTp'][self.ncfileindex],
                             'wavedirbin':  self.ncfile['waveDirectionBins'][:],
-                            'dWED':        self.ncfile['directionalWaveEnergyDensity'][self.wavedataindex,
+                            'dWED':        self.ncfile['directionalWaveEnergyDensity'][self.ncfileindex,
                                            :, :],
-                            'waveDm':      self.ncfile['waveDm'][self.wavedataindex],
-                            'waveTm':      self.ncfile['waveTm'][self.wavedataindex],
-                            'waveTp':      self.ncfile['waveTp'][self.wavedataindex],
-                            'WL':          self.ncfile['waterLevel'][self.wavedataindex],
-                            'qcFlagWL':    self.ncfile['qcFlag'][self.wavedataindex, 2],
-                            'qcFlagWind':  self.ncfile['qcFlag'][self.wavedataindex, 1]}
+                            'waveDm':      self.ncfile['waveDm'][self.ncfileindex],
+                            'waveTm':      self.ncfile['waveTm'][self.ncfileindex],
+                            'waveTp':      self.ncfile['waveTp'][self.ncfileindex],
+                            'WL':          self.ncfile['waterLevel'][self.ncfileindex],
+                            'qcFlagWL':    self.ncfile['qcFlag'][self.ncfileindex, 2],
+                            'qcFlagWind':  self.ncfile['qcFlag'][self.ncfileindex, 1]}
                 wavespec['units'] = {'Hs':self.ncfile['waveHs'].units,
                         'dWED':self.ncfile['directionalWaveEnergyDensity'].units,
                         'waveDm':self.ncfile['waveDm'].units,'waveTm':self.ncfile['waveTm'].units,
@@ -3248,13 +3260,13 @@ class getDataTestBed:
                 wavespec['fspec'] = wavespec['dWED'].sum(axis=2) * np.median(
                     np.diff(np.array(wavespec['wavedirbin'])))
                 if model == 'STWAVE':
-                    wavespec['Umag'] = self.ncfile['Umag'][self.wavedataindex]
-                    wavespec['Udir'] = self.ncfile['Udir'][self.wavedataindex]
+                    wavespec['Umag'] = self.ncfile['Umag'][self.ncfileindex]
+                    wavespec['Udir'] = self.ncfile['Udir'][self.ncfileindex]
                     wavespec['units']['Umag'] = self.ncfile['Umag'].units
                     wavespec['units']['Udir'] = self.ncfile['Udir'].units
                 wavespec['dWED'][wavespec['dWED'] == 0] = 1e-6
                 wavespec['fspec'][wavespec['fspec'] == 0] = 1e-6
-            qcFlags = self.ncfile['qcFlag'][self.wavedataindex]
+            qcFlags = self.ncfile['qcFlag'][self.ncfileindex]
             if removeBadWLFlag is not False:
                 idxGood = np.argwhere(qcFlags[:, 2] <= 5).squeeze()
                 wavespec = sb.reduceDict(wavespec, idxGood)
@@ -3411,33 +3423,22 @@ def getArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=Tr
         logging.basicConfig(level=logging.INFO)
 
     # Validate imageType
-    valid_types = ['timex', 'var', 'snap', 'bright', 'dark']
-    if imageType.lower() not in valid_types:
-        raise ValueError(f"Invalid imageType '{imageType}'. Must be one of: {valid_types}")
+    if imageType.lower() not in config.ARGUS_IMAGE_TYPES:
+        raise ValueError(f"Invalid imageType '{imageType}'. Must be one of: {config.ARGUS_IMAGE_TYPES}")
 
-    # Round to nearest 30 minutes
-    minutes = dateOfInterest.minute
-    if minutes < 15:
-        rounded_minutes = 0
-    elif minutes < 45:
-        rounded_minutes = 30
-    else:
-        rounded_minutes = 0
-        dateOfInterest = dateOfInterest + DT.timedelta(hours=1)
-
-    roundedTime = dateOfInterest.replace(minute=rounded_minutes, second=0, microsecond=0)
+    # Round to nearest 30 minutes using centralized utility
+    roundedTime = sb.roundDatetimeToInterval(dateOfInterest, config.ARGUS_IMAGE_INTERVAL_MINUTES)
 
     # Construct URL
-    baseURL = "https://coastalimaging.erdc.dren.mil/FrfTower/Processed/Orthophotos/cxgeo/"
     fldr = roundedTime.strftime("%Y_%m_%d")
     fname = f'{roundedTime.strftime("%Y%m%dT%H%M%SZ")}.FrfTower.cxgeo.{imageType}.tif'
-    url = urljoin(baseURL, fldr, fname)
+    url = urljoin(config.ARGUS_BASE_URL, fldr, fname)
 
     logging.info(f"Retrieving Argus imagery from {url}")
 
     # Download the image
     try:
-        resp = requests.get(url, stream=True, timeout=60)
+        resp = requests.get(url, stream=True, timeout=config.DEFAULT_TIMEOUT_SECONDS)
         resp.raise_for_status()
     except requests.exceptions.RequestException as e:
         logging.warning(f"Failed to retrieve Argus imagery: {e}")
@@ -3560,18 +3561,8 @@ def findArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=T
     if verbose:
         logging.basicConfig(level=logging.INFO)
 
-    # Round to nearest 30 minutes (same logic as getArgusImagery)
-    minutes = dateOfInterest.minute
-    if minutes < 15:
-        rounded_minutes = 0
-        rounded_time = dateOfInterest
-    elif minutes < 45:
-        rounded_minutes = 30
-        rounded_time = dateOfInterest
-    else:
-        rounded_minutes = 0
-        rounded_time = dateOfInterest + DT.timedelta(hours=1)
-    time_requested = rounded_time.replace(minute=rounded_minutes, second=0, microsecond=0)
+    # Round to nearest 30 minutes using centralized utility
+    time_requested = sb.roundDatetimeToInterval(dateOfInterest, config.ARGUS_IMAGE_INTERVAL_MINUTES)
 
     # Calculate max number of 30-min slots to search
     max_slots = int(search_window_hours * 2)
