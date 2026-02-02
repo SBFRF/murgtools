@@ -1353,8 +1353,8 @@ class getObs:
         elif str(gaugenumber).lower() in ['awac-jpier-11m', 'awac-jpier', 'jpier-11m']:
             self.dataloc = 'oceanography/waves/awac-jpier-11m/awac-jpier-11m.ncml'
         # New waveriders
-        elif str(gaugenumber).lower() in ['waverider-17m-1d', d/waverider-17m-1d
-            self.dataloc = 'oceanography/waves/waverider-17m-1D/waverider-17m-1D.ncml'
+        elif str(gaugenumber).lower() in ['waverider-17m-1d', '17m-1d']:
+            self.dataloc = 'oceanography/waves/waverider-17m-1d/waverider-17m-1d.ncml'
         elif str(gaugenumber).lower() in ['waverider-20m', 'waverider-20m-1d', '20m', '20m-1d']:
             self.dataloc = 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'
         # Paros pressure sensors - support both naming conventions
