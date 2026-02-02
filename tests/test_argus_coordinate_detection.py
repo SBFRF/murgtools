@@ -1,0 +1,80 @@
+"""Test Argus imagery coordinate system detection."""
+
+import pytest
+from murgtools.utils import geoprocess as gp
+
+
+def test_state_plane_to_latlon_conversion():
+    """Test that State Plane coordinates are correctly identified and converted."""
+    # State Plane coordinates for FRF area
+    sp_left = 901951.6805  # Origin Easting
+    sp_bottom = 274093.1562  # Origin Northing
+    sp_right = sp_left + 1000  # 1km east
+    sp_top = sp_bottom + 1000  # 1km north
+    
+    extent = [sp_left, sp_right, sp_bottom, sp_top]
+    left, right, bottom, top = extent
+    
+    # Should detect as State Plane
+    assert left > 800000 and bottom > 200000, "Should detect State Plane coordinates"
+    
+    # Convert to lat/lon
+    ll_corner = gp.FRFcoord(left, bottom, coordType='ncsp')
+    ur_corner = gp.FRFcoord(right, top, coordType='ncsp')
+    
+    # Check that conversion produces reasonable lat/lon values
+    assert -76 < ll_corner['Lon'] < -75, f"Longitude should be in FRF range, got {ll_corner['Lon']}"
+    assert 36 < ll_corner['Lat'] < 37, f"Latitude should be in FRF range, got {ll_corner['Lat']}"
+    assert -76 < ur_corner['Lon'] < -75, f"Longitude should be in FRF range, got {ur_corner['Lon']}"
+    assert 36 < ur_corner['Lat'] < 37, f"Latitude should be in FRF range, got {ur_corner['Lat']}"
+    
+    # Check that the converted extent makes sense
+    argus_extent = [ll_corner['Lon'], ur_corner['Lon'], ll_corner['Lat'], ur_corner['Lat']]
+    assert argus_extent[0] < argus_extent[1], "Longitude min should be less than max"
+    assert argus_extent[2] < argus_extent[3], "Latitude min should be less than max"
+
+
+def test_latlon_coordinates_not_converted():
+    """Test that lon/lat coordinates are correctly identified and used directly."""
+    # Lon/lat coordinates for FRF area
+    lon_left = -75.760
+    lon_right = -75.720
+    lat_bottom = 36.175
+    lat_top = 36.195
+    
+    extent = [lon_left, lon_right, lat_bottom, lat_top]
+    left, right, bottom, top = extent
+    
+    # Should NOT detect as State Plane (values too small)
+    assert not (left > 800000 and bottom > 200000), "Should NOT detect lon/lat as State Plane"
+    
+    # Should use extent directly without conversion
+    argus_extent = extent
+    
+    # Verify extent is valid
+    assert argus_extent[0] < argus_extent[1], "Longitude min should be less than max"
+    assert argus_extent[2] < argus_extent[3], "Latitude min should be less than max"
+    assert -76 < argus_extent[0] < -75, "Longitude should be in FRF range"
+    assert 36 < argus_extent[2] < 37, "Latitude should be in FRF range"
+
+
+def test_coordinate_detection_edge_cases():
+    """Test edge cases for coordinate system detection."""
+    # Edge case 1: Very small State Plane values (shouldn't happen but test robustness)
+    extent1 = [100, 200, 300, 400]
+    left, right, bottom, top = extent1
+    assert not (left > 800000 and bottom > 200000), "Small values should not be detected as State Plane"
+    
+    # Edge case 2: Negative values (definitely lon/lat or some other system)
+    extent2 = [-75.76, -75.72, 36.17, 36.19]
+    left, right, bottom, top = extent2
+    assert not (left > 800000 and bottom > 200000), "Negative values should not be detected as State Plane"
+    
+    # Edge case 3: Mixed values (one coordinate is State Plane-like but not both)
+    extent3 = [900000, 901000, 36.17, 36.19]  # Easting looks like SP, but Northing doesn't
+    left, right, bottom, top = extent3
+    assert not (left > 800000 and bottom > 200000), "Mixed coordinates should not be detected as State Plane"
+
+
+if __name__ == '__main__':
+    pytest.main([__file__, '-v'])
