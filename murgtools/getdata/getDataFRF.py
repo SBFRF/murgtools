@@ -3217,11 +3217,14 @@ class getDataTestBed:
         # parsing out data of interest in time
 
         self.dataloc = urlFront + '/' + fname
-        self.ncfile, self.allEpoch = getnc(dataLoc=self.dataloc, callingClass=self.callingClass, dtRound=1 * 60,server=self.server)
+        self.ncfile, self.allEpoch, indexRef = getnc(dataLoc=self.dataloc, callingClass=self.callingClass, dtRound=1 * 60,server=self.server)
         try:
             # go get indices of interest
             self.wavedataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
                                          epochEnd=self.epochd2)
+            # Compute absolute index for netCDF file access when getnc() returned a subset
+            indexOffset = indexRef[0] if indexRef is not None else 0
+            self.ncfileindex = self.wavedataindex + indexOffset  # absolute index for ncfile access
             assert np.array(
                 self.wavedataindex).all() != None, 'there''s no data in your time period'
             if np.size(self.wavedataindex) >= 1:
