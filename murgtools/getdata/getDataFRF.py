@@ -532,7 +532,8 @@ class getObs:
         """
         valid_gauges = [2, 3, 4, 5, 6, 'awac-11m', 'awac-8m', 'awac-6m', 'awac-4.5m', 'awac-5m',
                         'adop-3.5m', 'awac-jpier-11m', 'awac-jpier', 'jpier-11m',
-                        'sig769-300', 'sig940-300', 'sig940-400', 'sig940-600']
+                        'sig769-300', '769-300',
+                        'sig940-300', '940-300', 'sig940-400', '940-400', 'sig940-600', '940-600']
         gauge_lower = str(gaugenumber).lower()
         if gauge_lower not in valid_gauges and gaugenumber not in valid_gauges:
             raise InvalidGaugeError(gaugenumber, valid_gauges=valid_gauges)
