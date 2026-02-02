@@ -392,44 +392,53 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
         image = tifffile.imread(tmp_path)
 
         # Extract actual image extent from GeoTIFF tags and convert to lat/lon
-        # STAC bbox is not reliable for pixel coordinate calculation
-        with tifffile.TiffFile(tmp_path) as tif:
-            tags = tif.pages[0].tags
-            tiepoint = tags[33922].value  # (i, j, k, x, y, z) - UTM coordinates
-            scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
-            img_h, img_w = tif.pages[0].shape[:2]
+        # STAC bbox is not reliable for pixel coordinate calculation when tags are present
+        try:
+            with tifffile.TiffFile(tmp_path) as tif:
+                tags = tif.pages[0].tags
+                # Tags 33922 (ModelTiepointTag) and 33550 (ModelPixelScaleTag)
+                # may be missing for some GeoTIFFs; handle this gracefully.
+                tiepoint_tag = tags[33922]  # may raise KeyError if missing
+                scale_tag = tags[33550]     # may raise KeyError if missing
+                tiepoint = tiepoint_tag.value  # (i, j, k, x, y, z) - UTM coordinates
+                scale = scale_tag.value       # (scaleX, scaleY, scaleZ)
+                img_h, img_w = tif.pages[0].shape[:2]
 
-            # UTM bounds
-            utm_left = tiepoint[3]
-            utm_right = tiepoint[3] + img_w * scale[0]
-            utm_top = tiepoint[4]
-            utm_bottom = tiepoint[4] - img_h * scale[1]
+                # UTM bounds
+                utm_left = tiepoint[3]
+                utm_right = tiepoint[3] + img_w * scale[0]
+                utm_top = tiepoint[4]
+                utm_bottom = tiepoint[4] - img_h * scale[1]
 
-            # Determine UTM zone from GeoKey (tag 34737 contains projection info)
-            proj_str = tags.get(34737, None)
-            if proj_str:
-                proj_str = proj_str.value
-                # Parse UTM zone from string like "WGS 84 / UTM zone 18N"
-                import re
-                match = re.search(r'UTM zone (\d+)([NS])', str(proj_str))
-                if match:
-                    zone = int(match.group(1))
-                    hemisphere = match.group(2)
-                    epsg = 32600 + zone if hemisphere == 'N' else 32700 + zone
+                # Determine UTM zone from GeoKey (tag 34737 contains projection info)
+                proj_str = tags.get(34737, None)
+                if proj_str:
+                    proj_str = proj_str.value
+                    # Parse UTM zone from string like "WGS 84 / UTM zone 18N"
+                    import re
+                    match = re.search(r'UTM zone (\d+)([NS])', str(proj_str))
+                    if match:
+                        zone = int(match.group(1))
+                        hemisphere = match.group(2)
+                        epsg = 32600 + zone if hemisphere == 'N' else 32700 + zone
+                    else:
+                        epsg = 32618  # Default to zone 18N for FRF area
                 else:
-                    epsg = 32618  # Default to zone 18N for FRF area
-            else:
-                epsg = 32618
+                    epsg = 32618
 
-            # Convert UTM corners to lat/lon
-            from pyproj import Transformer
-            transformer = Transformer.from_crs(f'EPSG:{epsg}', 'EPSG:4326', always_xy=True)
+                # Convert UTM corners to lat/lon
+                from pyproj import Transformer
+                transformer = Transformer.from_crs(f'EPSG:{epsg}', 'EPSG:4326', always_xy=True)
 
-            tl_lon, tl_lat = transformer.transform(utm_left, utm_top)
-            br_lon, br_lat = transformer.transform(utm_right, utm_bottom)
+                tl_lon, tl_lat = transformer.transform(utm_left, utm_top)
+                br_lon, br_lat = transformer.transform(utm_right, utm_bottom)
 
-            # scene_bbox in lat/lon: [west, south, east, north]
-            scene_bbox = [tl_lon, br_lat, br_lon, tl_lat]
+                # scene_bbox in lat/lon: [west, south, east, north]
+                scene_bbox = [tl_lon, br_lat, br_lon, tl_lat]
+        except KeyError:
+            # Missing GeoTIFF georeferencing tags; fall back to STAC bbox if available.
+            if isinstance(item, dict) and 'bbox' in item:
+                scene_bbox = item['bbox']
     finally:
         os.unlink(tmp_path)
 
