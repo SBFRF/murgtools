@@ -789,8 +789,8 @@ class TestNewGaugeURLLookups:
         obs = getObs(d1, d2)
 
         waverider_gauges = [
-            ('waverider-17m-1d', 'oceanography/waves/waverider-17m-1D/waverider-17m-1D.ncml'),
-            ('17m-1d', 'oceanography/waves/waverider-17m-1D/waverider-17m-1D.ncml'),
+            ('waverider-17m-1d', 'oceanography/waves/waverider-17m-1d/waverider-17m-1d.ncml'),
+            ('17m-1d', 'oceanography/waves/waverider-17m-1d/waverider-17m-1d.ncml'),
             ('waverider-20m', 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'),
             ('waverider-20m-1d', 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'),
             ('20m', 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'),
