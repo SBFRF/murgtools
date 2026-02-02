@@ -13,6 +13,10 @@ import numpy as np
 from matplotlib import pyplot as plt
 from murgtools.getdata import getObs
 
+# Color constants for consistent styling
+BACKGROUND_COLOR = '#4d4d4d'  # Gray for time series background
+DEFAULT_GROUP_COLOR = '#1f77b4'  # Blue for default data group
+
 
 def bin_data(data_to_be_binned, bin_size=0.1):
     """Bin data into specified bin sizes.
@@ -23,14 +27,18 @@ def bin_data(data_to_be_binned, bin_size=0.1):
 
     Returns:
         tuple: (bin_indices, bins) where:
-            - bin_indices: Array of bin indices for each data point
+            - bin_indices: Array of bin indices for each data point (1-based indexing)
             - bins: Array of bin edges
 
     Examples:
         >>> data = np.array([0.5, 1.0, 1.5, 2.0])
         >>> indices, bins = bin_data(data, bin_size=0.5)
     """
-    bins = np.arange(np.nanmin(data_to_be_binned), np.ceil(np.nanmax(data_to_be_binned)), bin_size)
+    # Ensure the upper bound includes all data by adding bin_size
+    bins = np.arange(np.nanmin(data_to_be_binned), 
+                     np.ceil(np.nanmax(data_to_be_binned)) + bin_size, 
+                     bin_size)
+    # np.digitize returns 1-based indices
     bin_indices = np.digitize(data_to_be_binned, bins=bins, right=False)
     return bin_indices, bins
 
@@ -114,6 +122,10 @@ def conditions_plot(time_list, start_date, end_date, gauge='waverider-17m',
     gd = getObs(start_date, end_date, server=server)
     all_data = gd.getWaveData(gauge, spec=False)
 
+    # Validate that we have data
+    if len(all_data['time']) == 0:
+        raise ValueError(f"No wave data available for gauge '{gauge}' in the specified time range")
+
     # Convert times to datetime.datetime for easier manipulation
     # Handle both datetime objects and netCDF4 datetime objects
     if hasattr(all_data['time'][0], 'timetuple'):
@@ -126,19 +138,18 @@ def conditions_plot(time_list, start_date, end_date, gauge='waverider-17m',
         # If they're some other type, try to convert directly
         all_data_dates = np.array(all_data['time'])
 
-    # Handle Tp if requested but not in data (compute from peakf)
-    if y_var == 'Tp' and 'Tp' not in all_data:
-        if 'peakf' in all_data:
-            all_data['Tp'] = 1.0 / all_data['peakf']
-        else:
-            raise ValueError("Cannot compute Tp: 'peakf' not found in wave data")
+    # Helper function to ensure Tp exists when needed
+    def _ensure_tp_available():
+        """Compute Tp from peakf if not already available."""
+        if 'Tp' not in all_data:
+            if 'peakf' in all_data:
+                all_data['Tp'] = 1.0 / all_data['peakf']
+            else:
+                raise ValueError("Cannot compute Tp: 'peakf' not found in wave data")
 
-    # Also ensure Tp exists for x_var if requested
-    if x_var == 'Tp' and 'Tp' not in all_data:
-        if 'peakf' in all_data:
-            all_data['Tp'] = 1.0 / all_data['peakf']
-        else:
-            raise ValueError("Cannot compute Tp: 'peakf' not found in wave data")
+    # Handle Tp if requested for either axis
+    if x_var == 'Tp' or y_var == 'Tp':
+        _ensure_tp_available()
 
     # Validate that requested variables exist
     if x_var not in all_data:
@@ -178,7 +189,7 @@ def conditions_plot(time_list, start_date, end_date, gauge='waverider-17m',
         date_groups = [{
             'dates': processed_dates,
             'label': 'Data',
-            'color': '#1f77b4',
+            'color': DEFAULT_GROUP_COLOR,
             'marker': 'o'
         }]
     else:
@@ -204,7 +215,7 @@ def conditions_plot(time_list, start_date, end_date, gauge='waverider-17m',
     # Panel 1: Time series of primary variable
     ax1 = plt.subplot2grid((3, 2), (0, 0), colspan=2)
     ax1.set_title(f'{gauge} {x_var}')
-    ax1.plot(all_data['time'], all_data[x_var], color='#4d4d4d', linewidth=0.5)
+    ax1.plot(all_data['time'], all_data[x_var], color=BACKGROUND_COLOR, linewidth=0.5)
     ax1.set_ylabel(f'{x_var}')
     ax1.set_xlabel('Date')
 
