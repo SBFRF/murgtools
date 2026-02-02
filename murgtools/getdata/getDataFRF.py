@@ -3218,7 +3218,7 @@ class getDataTestBed:
         # parsing out data of interest in time
 
         self.dataloc = urlFront + '/' + fname
-        self.ncfile, self.allEpoch, _ = getnc(dataLoc=self.dataloc, callingClass=self.callingClass, dtRound=1 * 60,server=self.server)
+        self.ncfile, self.allEpoch, indexRef = getnc(dataLoc=self.dataloc, callingClass=self.callingClass, dtRound=1 * 60,server=self.server)
         try:
             # go get indices of interest
             self.wavedataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,

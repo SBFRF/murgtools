@@ -25,8 +25,8 @@ THREDDS_TESTBED = 'http://134.164.129.62:8080/thredds/dodsC/CMTB'
 THREDDS_CRUNCH = 'http://134.164.129.55:8080/thredds/dodsC/cmtb/'
 
 # Survey data URLs
-SURVEY_TRANSECTS_URL = 'http://134.164.129.55/thredds/dodsC/FRF/geomorphology/elevationTransects/survey/surveyTransects.ncml'
-WAVE_8M_ARRAY_URL = 'http://134.164.129.55/thredds/dodsC/FRF/oceanography/waves/8m-array/2017/FRF-ocean_waves_8m-array_201707.nc'
+SURVEY_TRANSECTS_URL = 'http://134.164.129.55/thredds/dodsC/FRF/geomorphology/elevationTransects/survey/surveyTransects.ncml'  # noqa: E501
+WAVE_8M_ARRAY_URL = 'http://134.164.129.55/thredds/dodsC/FRF/oceanography/waves/8m-array/2017/FRF-ocean_waves_8m-array_201707.nc'  # noqa: E501
 
 # =============================================================================
 # Imagery URLs
