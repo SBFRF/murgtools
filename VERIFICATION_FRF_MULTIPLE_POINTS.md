@@ -2,13 +2,13 @@
 
 ## Issue Summary
 
-**Original Issue**: "Currently FRF coord is limited to single point inputs thereby requiring looping outside of this function."
+**Original Issue**: "Currently `FRFcoord` is limited to single point inputs thereby requiring looping outside of this function."
 
 **Agent Instructions**: "I think this was solved with most recent update to Transformer class in pyproj. confirm or fix"
 
 ## Verification Results
 
-### ✅ CONFIRMED: FRFcoord Already Supports Multiple Input Points
+### ✅ CONFIRMED: `FRFcoord` Already Supports Multiple Input Points
 
 The `FRFcoord` function and all related coordinate transformation functions in `murgtools.utils.geoprocess` **already support multiple input points** without requiring any code changes.
 
