@@ -673,7 +673,7 @@ class TestGetObsGetCurrents:
         d2 = DT.datetime(2020, 1, 2)
 
         from murgtools.getdata.getDataFRF import getObs
-        obs = getObs(d1, d2)
+        getObs(d1, d2)
 
         valid_gauges = ['awac-11m', 'awac-8m', 'awac-6m', 'awac-4.5m', 'adop-3.5m']
         for gauge in valid_gauges:
