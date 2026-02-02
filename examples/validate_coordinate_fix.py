@@ -7,6 +7,7 @@ correctly by detecting which system is being used and applying the appropriate c
 """
 
 from murgtools.utils import geoprocess as gp
+from murgtools.getdata import detect_argus_coordinate_system
 
 
 def validate_fix():
@@ -19,13 +20,14 @@ def validate_fix():
     # Test Case 1: State Plane coordinates (old format)
     print("\n--- Test Case 1: State Plane Coordinates ---")
     sp_extent = [901951.6805, 902951.6805, 274093.1562, 275093.1562]
-    left, right, bottom, top = sp_extent
     print(f"Input extent: {sp_extent}")
-    print(f"Checking if State Plane: left={left} > 800000 = {left > 800000}")
-    print(f"                        bottom={bottom} > 200000 = {bottom > 200000}")
     
-    if left > 800000 and bottom > 200000:
-        print("✓ Detected as State Plane - converting to lon/lat")
+    coord_system = detect_argus_coordinate_system(sp_extent)
+    print(f"Detected coordinate system: {coord_system}")
+    
+    if coord_system == 'state_plane':
+        print("✓ Correctly detected as State Plane - converting to lon/lat")
+        left, right, bottom, top = sp_extent
         ll_corner = gp.FRFcoord(left, bottom, coordType='ncsp')
         ur_corner = gp.FRFcoord(right, top, coordType='ncsp')
         argus_extent = [ll_corner['Lon'], ur_corner['Lon'], ll_corner['Lat'], ur_corner['Lat']]
@@ -44,16 +46,13 @@ def validate_fix():
     # Test Case 2: Lon/Lat coordinates (new format that was causing the bug)
     print("\n--- Test Case 2: Lon/Lat Coordinates ---")
     latlon_extent = [-75.760, -75.720, 36.175, 36.195]
-    left, right, bottom, top = latlon_extent
     print(f"Input extent: {latlon_extent}")
-    print(f"Checking if State Plane: left={left} > 800000 = {left > 800000}")
-    print(f"                        bottom={bottom} > 200000 = {bottom > 200000}")
     
-    if left > 800000 and bottom > 200000:
-        print("✗ ERROR: Should NOT have detected as State Plane")
-        return False
-    else:
-        print("✓ Detected as lon/lat - using directly without conversion")
+    coord_system = detect_argus_coordinate_system(latlon_extent)
+    print(f"Detected coordinate system: {coord_system}")
+    
+    if coord_system == 'lonlat':
+        print("✓ Correctly detected as lon/lat - using directly without conversion")
         argus_extent = latlon_extent
         print(f"Final extent: {argus_extent}")
         
@@ -63,21 +62,24 @@ def validate_fix():
         assert -76 < argus_extent[0] < -75, "Longitude in FRF range"
         assert 36 < argus_extent[2] < 37, "Latitude in FRF range"
         print("✓ No conversion needed - coordinates are already in expected range")
+    else:
+        print("✗ ERROR: Should have detected lon/lat coordinates")
+        return False
     
     # Test Case 3: Edge case - very small values
     print("\n--- Test Case 3: Edge Case - Small Values ---")
     small_extent = [100, 200, 300, 400]
-    left, right, bottom, top = small_extent
     print(f"Input extent: {small_extent}")
-    print(f"Checking if State Plane: left={left} > 800000 = {left > 800000}")
-    print(f"                        bottom={bottom} > 200000 = {bottom > 200000}")
     
-    if left > 800000 and bottom > 200000:
-        print("✗ ERROR: Should NOT have detected small values as State Plane")
-        return False
-    else:
-        print("✓ Correctly did NOT detect as State Plane")
+    coord_system = detect_argus_coordinate_system(small_extent)
+    print(f"Detected coordinate system: {coord_system}")
+    
+    if coord_system == 'lonlat':
+        print("✓ Correctly detected as lon/lat (not State Plane)")
         print("  (Would use values directly, though they're not valid FRF coords)")
+    else:
+        print("✗ ERROR: Should have detected as lon/lat (not State Plane)")
+        return False
     
     print("\n" + "="*80)
     print("✓ ALL VALIDATION TESTS PASSED")

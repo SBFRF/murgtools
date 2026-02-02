@@ -2,6 +2,25 @@
 
 import pytest
 from murgtools.utils import geoprocess as gp
+from murgtools.getdata import detect_argus_coordinate_system
+
+
+def test_state_plane_detection():
+    """Test that State Plane coordinates are correctly detected."""
+    # State Plane coordinates for FRF area
+    sp_extent = [901951.6805, 902951.6805, 274093.1562, 275093.1562]
+    
+    coord_system = detect_argus_coordinate_system(sp_extent)
+    assert coord_system == 'state_plane', "Should detect State Plane coordinates"
+
+
+def test_lonlat_detection():
+    """Test that lon/lat coordinates are correctly detected."""
+    # Lon/lat coordinates for FRF area
+    ll_extent = [-75.760, -75.720, 36.175, 36.195]
+    
+    coord_system = detect_argus_coordinate_system(ll_extent)
+    assert coord_system == 'lonlat', "Should detect lon/lat coordinates"
 
 
 def test_state_plane_to_latlon_conversion():
@@ -13,12 +32,13 @@ def test_state_plane_to_latlon_conversion():
     sp_top = sp_bottom + 1000  # 1km north
     
     extent = [sp_left, sp_right, sp_bottom, sp_top]
-    left, right, bottom, top = extent
     
     # Should detect as State Plane
-    assert left > 800000 and bottom > 200000, "Should detect State Plane coordinates"
+    coord_system = detect_argus_coordinate_system(extent)
+    assert coord_system == 'state_plane', "Should detect State Plane coordinates"
     
     # Convert to lat/lon
+    left, right, bottom, top = extent
     ll_corner = gp.FRFcoord(left, bottom, coordType='ncsp')
     ur_corner = gp.FRFcoord(right, top, coordType='ncsp')
     
@@ -43,10 +63,10 @@ def test_latlon_coordinates_not_converted():
     lat_top = 36.195
     
     extent = [lon_left, lon_right, lat_bottom, lat_top]
-    left, right, bottom, top = extent
     
-    # Should NOT detect as State Plane (values too small)
-    assert not (left > 800000 and bottom > 200000), "Should NOT detect lon/lat as State Plane"
+    # Should detect as lon/lat
+    coord_system = detect_argus_coordinate_system(extent)
+    assert coord_system == 'lonlat', "Should detect lon/lat coordinates"
     
     # Should use extent directly without conversion
     argus_extent = extent
@@ -62,18 +82,18 @@ def test_coordinate_detection_edge_cases():
     """Test edge cases for coordinate system detection."""
     # Edge case 1: Very small State Plane values (shouldn't happen but test robustness)
     extent1 = [100, 200, 300, 400]
-    left, right, bottom, top = extent1
-    assert not (left > 800000 and bottom > 200000), "Small values should not be detected as State Plane"
+    coord_system1 = detect_argus_coordinate_system(extent1)
+    assert coord_system1 == 'lonlat', "Small values should be detected as lon/lat"
     
     # Edge case 2: Negative values (definitely lon/lat or some other system)
     extent2 = [-75.76, -75.72, 36.17, 36.19]
-    left, right, bottom, top = extent2
-    assert not (left > 800000 and bottom > 200000), "Negative values should not be detected as State Plane"
+    coord_system2 = detect_argus_coordinate_system(extent2)
+    assert coord_system2 == 'lonlat', "Negative values should be detected as lon/lat"
     
     # Edge case 3: Mixed values (one coordinate is State Plane-like but not both)
     extent3 = [900000, 901000, 36.17, 36.19]  # Easting looks like SP, but Northing doesn't
-    left, right, bottom, top = extent3
-    assert not (left > 800000 and bottom > 200000), "Mixed coordinates should not be detected as State Plane"
+    coord_system3 = detect_argus_coordinate_system(extent3)
+    assert coord_system3 == 'lonlat', "Mixed coordinates should be detected as lon/lat"
 
 
 if __name__ == '__main__':

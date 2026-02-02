@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy as np
 
-from murgtools.getdata import getObs, getSatelliteImagery, findArgusImagery, get_geotiff_extent
+from murgtools.getdata import (getObs, getSatelliteImagery, findArgusImagery, 
+                               get_geotiff_extent, detect_argus_coordinate_system)
 from murgtools.utils import geoprocess as gp
 
 
@@ -131,21 +132,18 @@ def main():
             extent = get_geotiff_extent(tmp_path)
             print(f"  GeoTIFF extent: {extent}")
 
-            # Detect coordinate system based on value ranges
-            # State Plane coordinates for FRF: Easting ~900000-910000, Northing ~270000-280000
-            # Lon/Lat coordinates for FRF: Longitude ~-76 to -75, Latitude ~36.1 to 36.2
-            left, right, bottom, top = extent
+            # Detect coordinate system and convert if needed
+            coord_system = detect_argus_coordinate_system(extent)
+            print(f"  Detected coordinate system: {coord_system}")
             
-            # Check if values are in State Plane range (Easting > 800000, Northing > 200000)
-            if left > 800000 and bottom > 200000:
-                # Extent is in State Plane - convert to lat/lon
-                print(f"  Detected State Plane coordinates")
+            if coord_system == 'state_plane':
+                # Convert State Plane corners to lat/lon
+                left, right, bottom, top = extent
                 ll_corner = gp.FRFcoord(left, bottom, coordType='ncsp')  # SW corner
                 ur_corner = gp.FRFcoord(right, top, coordType='ncsp')    # NE corner
                 argus_extent = [ll_corner['Lon'], ur_corner['Lon'], ll_corner['Lat'], ur_corner['Lat']]
             else:
-                # Extent is already in lon/lat - use directly
-                print(f"  Detected lon/lat coordinates")
+                # Already in lon/lat - use directly
                 argus_extent = extent
             
             print(f"  Final lat/lon extent: {argus_extent}")
