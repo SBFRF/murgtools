@@ -319,7 +319,7 @@ class getObs:
         try:
             self.wavedataindex = gettime(allEpoch=self.allEpoch, epochStart=self.epochd1,
                                          epochEnd=self.epochd2)
-            if self.wavedataindex is None:
+            if self.wavedataindex is None or np.size(self.wavedataindex) == 0:
                 raise ValueError('there is no data in your time period')
             # Compute absolute index for netCDF file access when getnc() returned a subset
             indexOffset = indexRef[0] if indexRef is not None else 0
