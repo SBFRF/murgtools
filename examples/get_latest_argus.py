@@ -40,7 +40,7 @@ def main():
     )
 
     if result:
-        new_name= f'argus_{image_type}_{result["time"].strftime("%Y%m%d_%H%MZ")}.png'
+        new_name= f'{result["time"].strftime("%Y%m%d_%H%MZ")}_argus_{image_type}.tif'
         os.rename(output_file, new_name)
         print(f"\nSuccess!")
         print(f"  Image time: {result['time'].strftime('%Y-%m-%d %H:%M')}")
