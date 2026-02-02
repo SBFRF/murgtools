@@ -3641,7 +3641,7 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
             Defaults to 'FRF'.
         imageType (str, optional): Type of Argus image product. Available options:
             - 'timex': Time exposure average (default) - averaged pixel intensities
-            - 'gray' or 'grey' or 'bw': Grayscale (weighted average using standard luminance formula)
+            - 'var': Variance image - pixel intensity variance
             - 'snap': Snapshot - single frame capture
             - 'bright': Brightest pixels - maximum intensity over collection period
             - 'dark': Darkest pixels - minimum intensity over collection period
@@ -3649,7 +3649,7 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
             - 'red' or 'r' or 0: Red channel
             - 'green' or 'g' or 1: Green channel
             - 'blue' or 'b' or 2: Blue channel
-            - 'gray' or 'grey' or 'bw': Grayscale (average of RGB)
+            - 'gray' or 'grey' or 'bw': Grayscale (weighted average using standard luminance formula)
             - None: Return all RGB channels (default)
         verbose (bool, optional): Enable logging output. Defaults to True.
         **kwargs: Additional arguments passed to findArgusImagery (e.g.,
@@ -3703,6 +3703,10 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
     pixel_j = None
     xFRF = None
     yFRF = None
+    lon = None
+    lat = None
+    easting = None
+    northing = None
     is_slice = False
 
     # Parse location based on coordType
@@ -3719,6 +3723,9 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
         elif coordType.lower() in ['spnc', 'ncsp']:
             easting = location.get('easting', location.get('StateplaneE'))
             northing = location.get('northing', location.get('StateplaneN'))
+        else:
+            raise ValueError(f"Invalid coordType '{coordType}'. Must be one of: "
+                           "'pixel', 'FRF', 'LL', 'geographic', 'LatLon', 'spnc', 'ncsp'")
     elif isinstance(location, (tuple, list)) and len(location) == 2:
         # Check if either element is a slice
         if isinstance(location[0], slice) or isinstance(location[1], slice):
@@ -3736,6 +3743,9 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
                 lon, lat = location
             elif coordType.lower() in ['spnc', 'ncsp']:
                 easting, northing = location
+            else:
+                raise ValueError(f"Invalid coordType '{coordType}'. Must be one of: "
+                               "'pixel', 'FRF', 'LL', 'geographic', 'LatLon', 'spnc', 'ncsp'")
     else:
         raise ValueError("location must be a tuple/list of length 2, a slice, or a dictionary with appropriate keys")
 
@@ -3761,70 +3771,61 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
     valid_epochtimes = []
     intensities = []
     missing_times = []
+    
+    # Flag to track if we've computed pixel coordinates for non-pixel coordTypes
+    pixel_coords_computed = False
 
     # Process each time
     for time_target in times:
-            # Only compute pixel coordinates once per function call; reuse them for
-            # subsequent images assuming consistent georeferencing across time.
+        # Try to get the image using findArgusImagery if search parameters provided
+        if 'search_window_hours' in kwargs or 'method' in kwargs:
+            result = findArgusImagery(time_target, filename=None, imageType=imageType,
+                                    verbose=verbose, **kwargs)
+        else:
+            result = getArgusImagery(time_target, filename=None, imageType=imageType,
+                                   verbose=verbose)
+
+        if result is None:
+            if verbose:
+                logging.warning(f"No image found for time {time_target}")
+            missing_times.append(time_target)
+            continue
+
+        # Get image and geotiff extent
+        image = result['image']
+
+        # For GeoTIFF, we need to convert FRF coordinates to pixel coordinates
+        # Only do this once for the first valid image (assumes consistent georeferencing across time)
+        if coordType.lower() != 'pixel' and not pixel_coords_computed:
+            # We need to get the geotiff extent to map FRF to pixel coordinates
+            # The Argus GeoTIFFs use a specific coordinate system
+
+            # Try to download and parse the actual GeoTIFF to get proper georeferencing
+            with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+                tmp_path = tmp.name
+
             try:
-                # If pixel_i and pixel_j are already defined, reuse them.
-                pixel_i
-                pixel_j
-            except NameError:
-                # We need to get the geotiff extent to map FRF to pixel coordinates
-                # The Argus GeoTIFFs use a specific coordinate system
-                # For now, we'll use a simple approach based on the image dimensions
-                # and typical FRF coverage area
+                # Re-download to get geotiff tags
+                resp = requests.get(result['url'], stream=True, timeout=config.DEFAULT_TIMEOUT_SECONDS)
+                resp.raise_for_status()
+                with open(tmp_path, 'wb') as f:
+                    for chunk in resp.iter_content(chunk_size=8192):
+                        f.write(chunk)
 
-                # Try to download and parse the actual GeoTIFF to get proper georeferencing
-                import tempfile
-                with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
-                    tmp_path = tmp.name
+                # Parse GeoTIFF to get coordinate transformation
+                with tifffile.TiffFile(tmp_path) as tif:
+                    tags = tif.pages[0].tags
+                    # GeoTIFF tags: 33922=ModelTiepointTag, 33550=ModelPixelScaleTag
+                    if 33922 in tags and 33550 in tags:
+                        tiepoint = tags[33922].value  # (i, j, k, x, y, z)
+                        scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
 
-                try:
-                    # Re-download to get geotiff tags
-                    import requests
-                    resp = requests.get(result['url'], stream=True, timeout=config.DEFAULT_TIMEOUT_SECONDS)
-                    resp.raise_for_status()
-                    with open(tmp_path, 'wb') as f:
-                        for chunk in resp.iter_content(chunk_size=8192):
-                            f.write(chunk)
+                        # tiepoint: pixel (i,j) maps to world coordinates (x,y)
+                        # Convention: tiepoint = (pixel_i, pixel_j, 0, world_x, world_y, 0)
+                        origin_i, origin_j = tiepoint[0], tiepoint[1]
+                        origin_x, origin_y = tiepoint[3], tiepoint[4]
+                        scale_x, scale_y = scale[0], scale[1]
 
-                    # Parse GeoTIFF to get coordinate transformation
-                    with tifffile.TiffFile(tmp_path) as tif:
-                        tags = tif.pages[0].tags
-                        # GeoTIFF tags: 33922=ModelTiepointTag, 33550=ModelPixelScaleTag
-                        if 33922 in tags and 33550 in tags:
-                            tiepoint = tags[33922].value  # (i, j, k, x, y, z)
-                            scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
-
-                            # tiepoint: pixel (i,j) maps to world coordinates (x,y)
-                            # Convention: tiepoint = (pixel_i, pixel_j, 0, world_x, world_y, 0)
-                            origin_i, origin_j = tiepoint[0], tiepoint[1]
-                            origin_x, origin_y = tiepoint[3], tiepoint[4]
-                            scale_x, scale_y = scale[0], scale[1]
-
-                            # The world coordinates are likely in NC State Plane
-                            # Convert FRF to state plane
-                            frf_sp = gp.FRF2ncsp(xFRF, yFRF)
-                            sp_x = frf_sp['StateplaneE']
-                            sp_y = frf_sp['StateplaneN']
-
-                            # Convert state plane to pixel coordinates
-                            # pixel_i = (sp_x - origin_x) / scale_x + origin_i
-                            # pixel_j = (sp_y - origin_y) / scale_y + origin_j
-                            # Note: scale_y is typically negative (y increases downward in images)
-                            pixel_i = int(round((sp_x - origin_x) / scale_x + origin_i))
-                            pixel_j = int(round((sp_y - origin_y) / scale_y + origin_j))
-                        else:
-                            if verbose:
-                                logging.warning("GeoTIFF tags not found, skipping image")
-                            missing_times.append(time_target)
-                            continue
-                finally:
-                    # Clean up temp file
-                    if os.path.exists(tmp_path):
-                        os.unlink(tmp_path)
                         # The world coordinates are likely in NC State Plane
                         # Convert FRF to state plane
                         frf_sp = gp.FRF2ncsp(xFRF, yFRF)
@@ -3837,6 +3838,7 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
                         # Note: scale_y is typically negative (y increases downward in images)
                         pixel_i = int(round((sp_x - origin_x) / scale_x + origin_i))
                         pixel_j = int(round((sp_y - origin_y) / scale_y + origin_j))
+                        pixel_coords_computed = True
                     else:
                         if verbose:
                             logging.warning("GeoTIFF tags not found, skipping image")
@@ -3867,12 +3869,10 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
 
         # Handle channel selection
         if channel is not None:
-    # pixel_i and pixel_j are taken from the last valid image processed in the loop
-    location_info = {
-        'pixel_i': pixel_i,
-        'pixel_j': pixel_j,
-        # Record which image time these pixel coordinates correspond to
-        'pixel_coords_reference_time': valid_times[-1],
+            if is_slice:
+                # For slices, apply channel selection across the slice
+                if channel in ['red', 'r', 0]:
+                    intensity = pixel_value[:, :, 0] if pixel_value.ndim == 3 else pixel_value[..., 0]
                 elif channel in ['green', 'g', 1]:
                     intensity = pixel_value[:, :, 1] if pixel_value.ndim == 3 else pixel_value[..., 1]
                 elif channel in ['blue', 'b', 2]:
