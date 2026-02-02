@@ -3764,60 +3764,67 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
 
     # Process each time
     for time_target in times:
-        # Try to get the image using findArgusImagery if search parameters provided
-        if 'search_window_hours' in kwargs or 'method' in kwargs:
-            result = findArgusImagery(time_target, filename=None, imageType=imageType,
-                                    verbose=verbose, **kwargs)
-        else:
-            result = getArgusImagery(time_target, filename=None, imageType=imageType,
-                                   verbose=verbose)
-
-        if result is None:
-            if verbose:
-                logging.warning(f"No image found for time {time_target}")
-            missing_times.append(time_target)
-            continue
-
-        # Get image and geotiff extent
-        image = result['image']
-
-        # For GeoTIFF, we need to convert FRF coordinates to pixel coordinates
-        # We'll do this by creating a temporary file or using the returned image metadata
-        # The image extent in the GeoTIFF should be in state plane or FRF coordinates
-
-        # Get pixel coordinates if we have FRF coordinates
-        if coordType.lower() != 'pixel':
-            # We need to get the geotiff extent to map FRF to pixel coordinates
-            # The Argus GeoTIFFs use a specific coordinate system
-            # For now, we'll use a simple approach based on the image dimensions
-            # and typical FRF coverage area
-
-            # Try to download and parse the actual GeoTIFF to get proper georeferencing
-            with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
-                tmp_path = tmp.name
-
+            # Only compute pixel coordinates once per function call; reuse them for
+            # subsequent images assuming consistent georeferencing across time.
             try:
-                # Re-download to get geotiff tags
-                resp = requests.get(result['url'], stream=True, timeout=config.DEFAULT_TIMEOUT_SECONDS)
-                resp.raise_for_status()
-                with open(tmp_path, 'wb') as f:
-                    for chunk in resp.iter_content(chunk_size=8192):
-                        f.write(chunk)
+                # If pixel_i and pixel_j are already defined, reuse them.
+                pixel_i
+                pixel_j
+            except NameError:
+                # We need to get the geotiff extent to map FRF to pixel coordinates
+                # The Argus GeoTIFFs use a specific coordinate system
+                # For now, we'll use a simple approach based on the image dimensions
+                # and typical FRF coverage area
 
-                # Parse GeoTIFF to get coordinate transformation
-                with tifffile.TiffFile(tmp_path) as tif:
-                    tags = tif.pages[0].tags
-                    # GeoTIFF tags: 33922=ModelTiepointTag, 33550=ModelPixelScaleTag
-                    if 33922 in tags and 33550 in tags:
-                        tiepoint = tags[33922].value  # (i, j, k, x, y, z)
-                        scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
+                # Try to download and parse the actual GeoTIFF to get proper georeferencing
+                import tempfile
+                with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+                    tmp_path = tmp.name
 
-                        # tiepoint: pixel (i,j) maps to world coordinates (x,y)
-                        # Convention: tiepoint = (pixel_i, pixel_j, 0, world_x, world_y, 0)
-                        origin_i, origin_j = tiepoint[0], tiepoint[1]
-                        origin_x, origin_y = tiepoint[3], tiepoint[4]
-                        scale_x, scale_y = scale[0], scale[1]
+                try:
+                    # Re-download to get geotiff tags
+                    import requests
+                    resp = requests.get(result['url'], stream=True, timeout=config.DEFAULT_TIMEOUT_SECONDS)
+                    resp.raise_for_status()
+                    with open(tmp_path, 'wb') as f:
+                        for chunk in resp.iter_content(chunk_size=8192):
+                            f.write(chunk)
 
+                    # Parse GeoTIFF to get coordinate transformation
+                    with tifffile.TiffFile(tmp_path) as tif:
+                        tags = tif.pages[0].tags
+                        # GeoTIFF tags: 33922=ModelTiepointTag, 33550=ModelPixelScaleTag
+                        if 33922 in tags and 33550 in tags:
+                            tiepoint = tags[33922].value  # (i, j, k, x, y, z)
+                            scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
+
+                            # tiepoint: pixel (i,j) maps to world coordinates (x,y)
+                            # Convention: tiepoint = (pixel_i, pixel_j, 0, world_x, world_y, 0)
+                            origin_i, origin_j = tiepoint[0], tiepoint[1]
+                            origin_x, origin_y = tiepoint[3], tiepoint[4]
+                            scale_x, scale_y = scale[0], scale[1]
+
+                            # The world coordinates are likely in NC State Plane
+                            # Convert FRF to state plane
+                            frf_sp = gp.FRF2ncsp(xFRF, yFRF)
+                            sp_x = frf_sp['StateplaneE']
+                            sp_y = frf_sp['StateplaneN']
+
+                            # Convert state plane to pixel coordinates
+                            # pixel_i = (sp_x - origin_x) / scale_x + origin_i
+                            # pixel_j = (sp_y - origin_y) / scale_y + origin_j
+                            # Note: scale_y is typically negative (y increases downward in images)
+                            pixel_i = int(round((sp_x - origin_x) / scale_x + origin_i))
+                            pixel_j = int(round((sp_y - origin_y) / scale_y + origin_j))
+                        else:
+                            if verbose:
+                                logging.warning("GeoTIFF tags not found, skipping image")
+                            missing_times.append(time_target)
+                            continue
+                finally:
+                    # Clean up temp file
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
                         # The world coordinates are likely in NC State Plane
                         # Convert FRF to state plane
                         frf_sp = gp.FRF2ncsp(xFRF, yFRF)
