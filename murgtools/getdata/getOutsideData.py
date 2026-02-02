@@ -10,7 +10,6 @@ import numpy as np
 from pyproj import Transformer
 
 from murgtools import config
-from pyproj import Transformer
 
 class forecastData:
     """A data retrival class situated around gathering forecast data."""
