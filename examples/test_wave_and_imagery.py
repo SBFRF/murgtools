@@ -8,6 +8,7 @@ Creates a two-panel figure:
 import datetime as DT
 import tempfile
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import numpy as np
 
 from murgtools.getdata import getObs, getSatelliteImagery, findArgusImagery, get_geotiff_extent
@@ -38,6 +39,10 @@ def main():
         'xp200m',
         'xp150m',
         'xp125m',
+        'sig940-300',
+        'sig940-400',
+        'sig940-600',
+        'sig769-300',
     ]
 
     # Retrieve wave data from all gauges
@@ -157,9 +162,10 @@ def main():
             ax1.plot(data['time'], data['Hs'], label=gauge_name, color=color, linewidth=1.5)
 
     ax1.set_ylabel('Significant Wave Height (m)')
-    ax1.set_title(f'Wave Height at FRF Gauges\n{d1.strftime("%Y-%m-%d")} to {d2.strftime("%Y-%m-%d")}')
+    ax1.set_title(f'Wave Height at FRF Gauges\n{d1.strftime("%d-%b")} to {d2.strftime("%d-%b")}')
     ax1.legend(loc='upper right', fontsize=8, ncol=2)
     ax1.grid(True, alpha=0.3)
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d-%b'))
     ax1.tick_params(axis='x', rotation=45)
 
     # =========================================
