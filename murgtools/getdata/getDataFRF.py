@@ -3869,10 +3869,12 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
 
         # Handle channel selection
         if channel is not None:
-            if is_slice:
-                # For slices, apply channel selection across the slice
-                if channel in ['red', 'r', 0]:
-                    intensity = pixel_value[:, :, 0] if pixel_value.ndim == 3 else pixel_value[..., 0]
+    # pixel_i and pixel_j are taken from the last valid image processed in the loop
+    location_info = {
+        'pixel_i': pixel_i,
+        'pixel_j': pixel_j,
+        # Record which image time these pixel coordinates correspond to
+        'pixel_coords_reference_time': valid_times[-1],
                 elif channel in ['green', 'g', 1]:
                     intensity = pixel_value[:, :, 1] if pixel_value.ndim == 3 else pixel_value[..., 1]
                 elif channel in ['blue', 'b', 2]:
