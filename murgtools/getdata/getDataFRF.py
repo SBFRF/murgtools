@@ -221,8 +221,8 @@ class getObs:
                                          'awac-11m', 'awac-jpier-11m', '8m-array',
                                          'awac-6m', 'awac-4.5m', 'adop-3.5m']
 
-        self.currentsGaugeList = ['awac-11m', 'awac-jpier-11m', 'awac-6m', 'awac-4.5m', 'adop-3.5m',
-                                  'sig769-300', 'sig940-300', 'sig940-400', 'sig940-600']
+        self.currentsGaugeList = ['awac-11m', 'awac-jpier-11m', 'awac-6m', 'awac-5m', 'awac-4.5m',
+                                  'adop-3.5m', 'sig769-300', 'sig940-300', 'sig940-400', 'sig940-600']
         #self.rawdataloc_wave = []
         #self.outputdir = []  # location for outputfiles
         self.d1 = d1  # start date for data grab
