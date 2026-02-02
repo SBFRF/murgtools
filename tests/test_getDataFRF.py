@@ -463,8 +463,8 @@ class TestGetObsGetWind:
         mock_ds.title = 'FRF Derived Wind'
         mock_ds.geospatial_vertical_max = 19.0
 
-        # getnc returns (ncFile, allEpoch) - 2 values for getWind (buggy code, should be 3)
-        mock_getnc.return_value = (mock_ds, time_values)
+        # getnc returns (ncFile, allEpoch, indexRef) - 3 values
+        mock_getnc.return_value = (mock_ds, time_values, None)
 
         # gettime returns indices
         mock_gettime.return_value = np.arange(72)
