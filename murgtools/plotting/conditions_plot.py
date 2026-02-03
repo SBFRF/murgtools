@@ -152,7 +152,12 @@ def conditions_plot(time_list, start_date, end_date, gauge='waverider-17m',
         """Compute Tp from peakf if not already available."""
         if 'Tp' not in all_data:
             if 'peakf' in all_data:
-                all_data['Tp'] = 1.0 / all_data['peakf']
+                # Safely compute Tp, avoiding divide-by-zero and infinite values
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    tp = np.divide(1.0, all_data['peakf'])
+                    # Replace non-finite results (inf, -inf, nan) with nan
+                    tp[~np.isfinite(tp)] = np.nan
+                all_data['Tp'] = tp
             else:
                 raise ValueError("Cannot compute Tp: 'peakf' not found in wave data")
 
