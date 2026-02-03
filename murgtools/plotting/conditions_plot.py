@@ -18,6 +18,29 @@ BACKGROUND_COLOR = '#4d4d4d'  # Gray for time series background
 DEFAULT_GROUP_COLOR = '#1f77b4'  # Blue for default data group
 
 
+def _validate_date_groups(date_groups):
+    """Validate that date_groups contains required keys.
+    
+    Args:
+        date_groups (list): List of dictionaries defining groups of dates.
+        
+    Raises:
+        ValueError: If any required keys are missing from a group.
+    """
+    required_keys = ['dates', 'label', 'color']
+    for i, group in enumerate(date_groups):
+        missing_keys = [key for key in required_keys if key not in group]
+        if missing_keys:
+            raise ValueError(
+                f"date_groups[{i}] is missing required keys: {missing_keys}. "
+                f"Each group must have 'dates' (list), 'label' (str), and 'color' (str)."
+            )
+        if not isinstance(group['dates'], list):
+            raise ValueError(
+                f"date_groups[{i}]['dates'] must be a list, got {type(group['dates']).__name__}"
+            )
+
+
 def bin_data(data_to_be_binned, bin_size=0.1):
     """Bin data into specified bin sizes.
 
@@ -49,6 +72,8 @@ def bin_data(data_to_be_binned, bin_size=0.1):
                      bin_size)
     # np.digitize returns 1-based indices, convert to 0-based for Python consistency
     bin_indices = np.digitize(data_array, bins=bins, right=False) - 1
+    # Guard against values equal to the minimum falling below the first bin (index -1)
+    bin_indices[bin_indices < 0] = 0
     return bin_indices, bins
 
 
@@ -208,6 +233,9 @@ def conditions_plot(time_list, start_date, end_date, gauge='waverider-17m',
             'marker': 'o'
         }]
     else:
+        # Validate date_groups structure
+        _validate_date_groups(date_groups)
+        
         # Process dates in each group
         for group in date_groups:
             processed_dates = []
@@ -261,6 +289,7 @@ def conditions_plot(time_list, start_date, end_date, gauge='waverider-17m',
                         alpha=0.15, color='black', label='95% (2σ)')
 
     # Plot data for each group
+    scatter_collection = None  # Keep track of scatter for colorbar
     for group in date_groups:
         group_x, group_y, group_colors = [], [], []
         
@@ -283,13 +312,18 @@ def conditions_plot(time_list, start_date, end_date, gauge='waverider-17m',
                 scatter = ax2.scatter(group_x, group_y, marker=group['marker'],
                                     c=group_colors, s=50, edgecolor='k',
                                     label=group['label'], cmap='viridis')
-                if len(date_groups) == 1:  # Only add colorbar if single group
-                    cbar = plt.colorbar(scatter, ax=ax2)
-                    cbar.set_label(color_var)
+                # Keep first scatter for colorbar
+                if scatter_collection is None:
+                    scatter_collection = scatter
             else:
                 ax2.scatter(group_x, group_y, marker=group['marker'],
                           c=group['color'], s=50, edgecolor='k',
                           label=group['label'])
+    
+    # Add colorbar if color_var was used
+    if color_var is not None and scatter_collection is not None:
+        cbar = plt.colorbar(scatter_collection, ax=ax2)
+        cbar.set_label(color_var)
 
     ax2.set_xlabel(f'{x_var}')
     ax2.set_ylabel(f'{y_var}')
