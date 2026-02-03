@@ -8,6 +8,7 @@ Creates a two-panel figure:
 import datetime as DT
 import tempfile
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import numpy as np
 
 from murgtools.getdata import getObs, getSatelliteImagery, findArgusImagery, get_geotiff_extent
@@ -31,7 +32,17 @@ def main():
         'waverider-26m',
         'waverider-17m',
         'awac-11m',
+        '8m-array',
+        'awac-6m',
+        'awac-4.5m',
+        'adop-3.5m',
+        'xp200m',
+        'xp150m',
+        'xp125m',
         'sig940-300',
+        'sig940-400',
+        'sig940-600',
+        'sig769-300',
         'lidarwavegauge140',
         'lidarwavegauge110',
         'lidarwavegauge100',
@@ -154,9 +165,14 @@ def main():
             ax1.plot(data['time'], data['Hs'], label=gauge_name, color=color, linewidth=1.5)
 
     ax1.set_ylabel('Significant Wave Height (m)')
-    ax1.set_title(f'Wave Height at FRF Gauges\n{d1.strftime("%Y-%m-%d")} to {d2.strftime("%Y-%m-%d")}')
+    if d1.year == d2.year:
+        date_range_str = f'{d1.strftime("%d-%b")} to {d2.strftime("%d-%b-%Y")}'
+    else:
+        date_range_str = f'{d1.strftime("%d-%b-%Y")} to {d2.strftime("%d-%b-%Y")}'
+    ax1.set_title(f'Wave Height at FRF Gauges\n{date_range_str}')
     ax1.legend(loc='upper right', fontsize=8, ncol=2)
     ax1.grid(True, alpha=0.3)
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d-%b'))
     ax1.tick_params(axis='x', rotation=45)
 
     # =========================================

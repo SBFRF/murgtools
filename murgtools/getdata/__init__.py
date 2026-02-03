@@ -6,7 +6,8 @@ the USACE Field Research Facility (FRF) Coastal Model Test Bed (CMTB).
 """
 
 from .getDataFRF import (getObs, getDataTestBed, gettime, getnc, removeDuplicatesFromDictionary,
-                         get_geotiff_extent, getArgusImagery, threadGetArgusImagery, findArgusImagery)
+                         get_geotiff_extent, getArgusImagery, threadGetArgusImagery, findArgusImagery,
+                         getArgusPixelIntensity)
 from .getOutsideData import forecastData, getSatelliteImagery
 from .getPlotData import alt_PlotData
 
@@ -26,5 +27,6 @@ __all__ = [
     "getArgusImagery",
     "threadGetArgusImagery",
     "findArgusImagery",
+    "getArgusPixelIntensity",
     "alt_PlotData",
 ]
