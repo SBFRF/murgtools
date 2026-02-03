@@ -302,5 +302,6 @@ def conditions_plot(time_list, start_date, end_date, gauge='waverider-17m',
     if ofname is not None:
         plt.savefig(ofname, dpi=150, bbox_inches='tight')
         print(f"Figure saved to {ofname}")
+        plt.close(fig)
 
     return fig, [ax1, ax2]
