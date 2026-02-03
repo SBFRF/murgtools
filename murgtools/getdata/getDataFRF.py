@@ -3348,20 +3348,28 @@ def get_geotiff_extent(filepath):
 
     Parses GeoTIFF tags (ModelTiepointTag and ModelPixelScaleTag) to compute
     geographic bounds suitable for matplotlib imshow extent parameter.
+    
+    ⚠️ IMPORTANT: This function returns coordinates in whatever CRS the GeoTIFF
+    uses. For Argus imagery at FRF, this is typically NC State Plane (NAD83).
+    You MUST convert to lon/lat before overlaying with satellite imagery!
 
     Args:
         filepath (str): Path to GeoTIFF file.
 
     Returns:
-        list: [left, right, bottom, top] extent in geographic coordinates
-            (typically lon/lat or projected coordinates depending on the GeoTIFF).
+        list: [left, right, bottom, top] extent in the GeoTIFF's native CRS.
+            For Argus imagery: NC State Plane meters (easting, northing)
+            For satellite imagery: Geographic degrees (lon, lat)
 
     Raises:
         KeyError: If required GeoTIFF tags are not present in the file.
 
     Example:
-        >>> extent = get_geotiff_extent('/path/to/image.tif')
-        >>> plt.imshow(image, extent=extent)
+        >>> extent = get_geotiff_extent('argus_image.tif')
+        >>> # extent is in State Plane! Convert to lon/lat:
+        >>> ll = gp.FRFcoord(extent[0], extent[2], coordType='ncsp')
+        >>> ur = gp.FRFcoord(extent[1], extent[3], coordType='ncsp')
+        >>> lonlat_extent = [ll['Lon'], ur['Lon'], ll['Lat'], ur['Lat']]
 
     """
     import tifffile
@@ -3378,6 +3386,48 @@ def get_geotiff_extent(filepath):
         right = left + width * scale[0]
         bottom = top - height * scale[1]
         return [left, right, bottom, top]
+
+
+def detect_geotiff_crs(filepath):
+    """Detect coordinate reference system of a GeoTIFF.
+    
+    Analyzes the coordinate ranges in a GeoTIFF to determine if it uses
+    NC State Plane (NAD83) coordinates or geographic (lon/lat) coordinates.
+    This is useful for validating coordinate system assumptions before plotting.
+    
+    Args:
+        filepath (str): Path to GeoTIFF file.
+    
+    Returns:
+        str: 'state_plane', 'lonlat', or 'unknown'
+            - 'state_plane': NC State Plane NAD83 (typical at FRF)
+            - 'lonlat': Geographic coordinates (longitude/latitude)
+            - 'unknown': Could not determine coordinate system
+    
+    Example:
+        >>> crs = detect_geotiff_crs('argus_image.tif')
+        >>> if crs == 'state_plane':
+        >>>     # Need to convert to lon/lat
+        >>>     extent = get_geotiff_extent(filepath)
+        >>>     # ... perform conversion ...
+        >>> elif crs == 'lonlat':
+        >>>     # Already in lon/lat, use directly
+        >>>     extent = get_geotiff_extent(filepath)
+    
+    """
+    extent = get_geotiff_extent(filepath)
+    left, right, bottom, top = extent
+    
+    # NC State Plane NAD83 typical ranges at FRF
+    # Easting: ~900,000 meters, Northing: ~270,000 meters
+    if (800000 < left < 1000000 and 200000 < bottom < 300000):
+        return 'state_plane'
+    # Geographic coordinates typical ranges
+    # Longitude: -180 to 180, Latitude: -90 to 90
+    elif (-180 <= left <= 180 and -90 <= bottom <= 90):
+        return 'lonlat'
+    else:
+        return 'unknown'
 
 
 def getArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=True):

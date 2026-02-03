@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy as np
 
-from murgtools.getdata import getObs, getSatelliteImagery, findArgusImagery, get_geotiff_extent
+from murgtools.getdata import getObs, getSatelliteImagery, findArgusImagery, get_geotiff_extent, detect_geotiff_crs
 from murgtools.utils import geoprocess as gp
 
 
@@ -127,21 +127,43 @@ def main():
             offset_mins = argus_result.get('time_offset_minutes', 0)
             if offset_mins != 0:
                 print(f"  Time offset from requested: {offset_mins} minutes ({offset_mins/60:.1f} hours)")
-            # Extract extent from the GeoTIFF (in State Plane coordinates)
+            # Extract extent from the GeoTIFF
             sp_extent = get_geotiff_extent(tmp_path)
-            print(f"  State Plane extent: {sp_extent}")
+            print(f"  Raw GeoTIFF extent: {sp_extent}")
 
-            # Convert State Plane corners to lat/lon
-            # sp_extent is [left, right, bottom, top] in State Plane Easting/Northing
-            sp_left, sp_right, sp_bottom, sp_top = sp_extent
+            # Detect coordinate system
+            crs_type = detect_geotiff_crs(tmp_path)
+            print(f"  Detected CRS: {crs_type}")
 
-            # Convert corners from State Plane to lat/lon
-            ll_corner = gp.FRFcoord(sp_left, sp_bottom, coordType='ncsp')  # SW corner
-            ur_corner = gp.FRFcoord(sp_right, sp_top, coordType='ncsp')    # NE corner
+            if crs_type == 'state_plane':
+                # Convert State Plane corners to lat/lon (THIS IS CORRECT!)
+                sp_left, sp_right, sp_bottom, sp_top = sp_extent
 
-            # Build lat/lon extent [left, right, bottom, top] as [lon_min, lon_max, lat_min, lat_max]
-            argus_extent = [ll_corner['Lon'], ur_corner['Lon'], ll_corner['Lat'], ur_corner['Lat']]
-            print(f"  Lat/Lon extent: {argus_extent}")
+                # Convert corners from State Plane to lat/lon
+                ll_corner = gp.FRFcoord(sp_left, sp_bottom, coordType='ncsp')  # SW corner
+                ur_corner = gp.FRFcoord(sp_right, sp_top, coordType='ncsp')    # NE corner
+
+                # Build lat/lon extent [left, right, bottom, top] as [lon_min, lon_max, lat_min, lat_max]
+                argus_extent = [ll_corner['Lon'], ur_corner['Lon'], ll_corner['Lat'], ur_corner['Lat']]
+                print(f"  Converted to lon/lat: {argus_extent}")
+
+            elif crs_type == 'lonlat':
+                # Already in lon/lat, use directly
+                argus_extent = sp_extent
+                print(f"  Using lon/lat extent directly: {argus_extent}")
+
+            else:
+                print(f"  ✗ Unknown CRS type for extent: {sp_extent}")
+                argus_extent = None
+
+            # Validate extent is reasonable
+            if argus_extent:
+                lon_range = argus_extent[1] - argus_extent[0]
+                lat_range = argus_extent[3] - argus_extent[2]
+
+                if lon_range > 1 or lat_range > 1:  # More than 1 degree is suspicious
+                    print(f"  ⚠ Warning: Extent spans {lon_range:.3f}° lon, {lat_range:.3f}° lat")
+                    print(f"  ⚠ This seems too large, coordinates may be incorrect")
     except Exception as e:
         print(f"  Error fetching Argus imagery: {e}")
 
