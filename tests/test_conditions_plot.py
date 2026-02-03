@@ -63,9 +63,10 @@ class TestConditionsPlot:
             'waveDirectionPeak': np.array([180.0 + i for i in range(24)]),
         }
 
-    @patch('murgtools.plotting.conditions_plot.getObs')
-    @patch('murgtools.plotting.conditions_plot.plt.savefig')
-    def test_conditions_plot_basic(self, mock_savefig, mock_getObs, mock_wave_data):
+    @patch('matplotlib.pyplot.savefig')
+    @patch('matplotlib.pyplot.close')
+    @patch('murgtools.getdata.getDataFRF.getObs')
+    def test_conditions_plot_basic(self, mock_getObs, mock_close, mock_savefig, mock_wave_data):
         """Test basic conditions plot creation."""
         # Setup mock
         mock_obs = MagicMock()
@@ -84,9 +85,10 @@ class TestConditionsPlot:
         assert len(axes) == 2
         mock_obs.getWaveData.assert_called_once()
 
-    @patch('murgtools.plotting.conditions_plot.getObs')
-    @patch('murgtools.plotting.conditions_plot.plt.savefig')
-    def test_conditions_plot_with_date_string(self, mock_savefig, mock_getObs, mock_wave_data):
+    @patch('matplotlib.pyplot.savefig')
+    @patch('matplotlib.pyplot.close')
+    @patch('murgtools.getdata.getDataFRF.getObs')
+    def test_conditions_plot_with_date_string(self, mock_getObs, mock_close, mock_savefig, mock_wave_data):
         """Test conditions plot with date strings."""
         # Setup mock
         mock_obs = MagicMock()
@@ -103,9 +105,10 @@ class TestConditionsPlot:
         assert fig is not None
         assert len(axes) == 2
 
-    @patch('murgtools.plotting.conditions_plot.getObs')
-    @patch('murgtools.plotting.conditions_plot.plt.savefig')
-    def test_conditions_plot_with_groups(self, mock_savefig, mock_getObs, mock_wave_data):
+    @patch('matplotlib.pyplot.savefig')
+    @patch('matplotlib.pyplot.close')
+    @patch('murgtools.getdata.getDataFRF.getObs')
+    def test_conditions_plot_with_groups(self, mock_getObs, mock_close, mock_savefig, mock_wave_data):
         """Test conditions plot with multiple date groups."""
         # Setup mock
         mock_obs = MagicMock()
@@ -136,8 +139,9 @@ class TestConditionsPlot:
         assert fig is not None
         assert len(axes) == 2
 
-    @patch('murgtools.plotting.conditions_plot.getObs')
-    def test_conditions_plot_tp_computation(self, mock_getObs, mock_wave_data):
+    @patch('matplotlib.pyplot.close')
+    @patch('murgtools.getdata.getDataFRF.getObs')
+    def test_conditions_plot_tp_computation(self, mock_getObs, mock_close, mock_wave_data):
         """Test that Tp is computed from peakf when not present."""
         # Setup mock
         mock_obs = MagicMock()
@@ -156,7 +160,7 @@ class TestConditionsPlot:
         call_args = mock_obs.getWaveData.call_args
         assert call_args is not None
 
-    @patch('murgtools.plotting.conditions_plot.getObs')
+    @patch('murgtools.getdata.getDataFRF.getObs')
     def test_conditions_plot_missing_variable(self, mock_getObs, mock_wave_data):
         """Test error handling for missing variables."""
         # Setup mock
@@ -172,9 +176,10 @@ class TestConditionsPlot:
         with pytest.raises(ValueError, match="not found in wave data"):
             conditions_plot(time_list, start_date, end_date, x_var='NonExistentVar')
 
-    @patch('murgtools.plotting.conditions_plot.getObs')
-    @patch('murgtools.plotting.conditions_plot.plt.savefig')
-    def test_conditions_plot_custom_limits(self, mock_savefig, mock_getObs, mock_wave_data):
+    @patch('matplotlib.pyplot.savefig')
+    @patch('matplotlib.pyplot.close')
+    @patch('murgtools.getdata.getDataFRF.getObs')
+    def test_conditions_plot_custom_limits(self, mock_getObs, mock_close, mock_savefig, mock_wave_data):
         """Test conditions plot with custom axis limits."""
         # Setup mock
         mock_obs = MagicMock()
@@ -196,9 +201,10 @@ class TestConditionsPlot:
         assert axes[1].get_xlim() == (0, 3)
         assert axes[1].get_ylim() == (5, 15)
 
-    @patch('murgtools.plotting.conditions_plot.getObs')
-    @patch('murgtools.plotting.conditions_plot.plt.savefig')
-    def test_conditions_plot_save_file(self, mock_savefig, mock_getObs, mock_wave_data):
+    @patch('matplotlib.pyplot.savefig')
+    @patch('matplotlib.pyplot.close')
+    @patch('murgtools.getdata.getDataFRF.getObs')
+    def test_conditions_plot_save_file(self, mock_getObs, mock_close, mock_savefig, mock_wave_data):
         """Test that plot is saved when ofname is provided."""
         # Setup mock
         mock_obs = MagicMock()
@@ -210,11 +216,9 @@ class TestConditionsPlot:
         start_date = dt.datetime(2023, 6, 1)
         end_date = dt.datetime(2023, 6, 30)
         
-        _, _ = conditions_plot(time_list, start_date, end_date, ofname='test_output.png')
+        conditions_plot(time_list, start_date, end_date, ofname='test_output.png')
         
         # Verify savefig was called
         mock_savefig.assert_called_once()
         call_args = mock_savefig.call_args
         assert 'test_output.png' in str(call_args)
-
-
