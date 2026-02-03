@@ -27,7 +27,7 @@ def bin_data(data_to_be_binned, bin_size=0.1):
 
     Returns:
         tuple: (bin_indices, bins) where:
-            - bin_indices: Array of bin indices for each data point (1-based indexing)
+            - bin_indices: Array of 0-based bin indices for each data point
             - bins: Array of bin edges
 
     Examples:
@@ -38,8 +38,8 @@ def bin_data(data_to_be_binned, bin_size=0.1):
     bins = np.arange(np.nanmin(data_to_be_binned), 
                      np.ceil(np.nanmax(data_to_be_binned)) + bin_size, 
                      bin_size)
-    # np.digitize returns 1-based indices
-    bin_indices = np.digitize(data_to_be_binned, bins=bins, right=False)
+    # np.digitize returns 1-based indices, convert to 0-based for Python consistency
+    bin_indices = np.digitize(data_to_be_binned, bins=bins, right=False) - 1
     return bin_indices, bins
 
 
@@ -163,7 +163,8 @@ def conditions_plot(time_list, start_date, end_date, gauge='waverider-17m',
     # Bin the x variable and compute mean/std of y variable in each bin
     idx_bins, bins = bin_data(all_data[x_var], bin_size=bin_size)
     y_std, y_mean = [], []
-    for ii in range(len(bins)):
+    # Loop through bins (indices are 0-based, so range is 0 to len(bins)-1)
+    for ii in range(len(bins) - 1):
         mask = idx_bins == ii
         if np.sum(mask) > 0:
             y_std.append(np.nanstd(all_data[y_var][mask]))
@@ -233,8 +234,9 @@ def conditions_plot(time_list, start_date, end_date, gauge='waverider-17m',
     ax2.set_title(f'{y_var} vs {x_var} During Specified Times')
 
     # Plot climatological distribution (mean +/- std)
+    # Use the left edge of each bin for x-coordinates (bins[:-1] since we have len(bins)-1 stats)
     valid_mask = ~np.isnan(y_mean) & ~np.isnan(y_std)
-    valid_bins = bins[valid_mask]
+    valid_bins = bins[:-1][valid_mask]  # Use left edges of bins
     valid_mean = y_mean[valid_mask]
     valid_std = y_std[valid_mask]
     

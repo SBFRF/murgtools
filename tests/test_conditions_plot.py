@@ -17,8 +17,9 @@ class TestBinData:
         
         assert len(bins) > 0
         assert len(bin_indices) == len(data)
-        # np.digitize returns 1-based indices
-        assert np.all(bin_indices >= 1)
+        # Indices should be 0-based (Python standard)
+        assert np.all(bin_indices >= 0)
+        assert np.all(bin_indices < len(bins))
 
     def test_bin_data_uniform_values(self):
         """Test binning with uniform values."""

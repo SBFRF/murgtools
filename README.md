@@ -32,6 +32,7 @@ pip install -e ".[dev]"
 
 ## Quick Start
 
+### Data Retrieval
 ```python
 from datetime import datetime
 from murgtools.getdata import getObs
@@ -53,6 +54,22 @@ wind_data = obs.getWind()
 wl_data = obs.getWL()
 ```
 
+### Plotting Survey Conditions
+```python
+from datetime import datetime
+from murgtools import conditions_plot
+
+# Define survey dates
+dates = [datetime(2023, 6, 15), datetime(2023, 7, 20)]
+start = datetime(2023, 1, 1)
+end = datetime(2023, 12, 31)
+
+# Create conditions plot showing Hs vs Tp with climatology
+fig, axes = conditions_plot(dates, start, end, ofname='conditions.png')
+```
+
+See [plotting/README.md](murgtools/plotting/README.md) for more plotting examples.
+
 ## Package Structure
 
 ```
@@ -61,11 +78,15 @@ murgtools/
 │   ├── getDataFRF.py    # FRF observational and model data
 │   ├── getOutsideData.py # External data sources
 │   └── getPlotData.py   # Plotting utilities
+├── plotting/            # Plotting subpackage
+│   └── conditions_plot.py # Survey/operational conditions visualization
 └── utils/               # Utility subpackage
     ├── geoprocess.py    # Coordinate transformations
     ├── sblib.py         # Base utility functions
     └── ...
 ```
+
+See [plotting/README.md](murgtools/plotting/README.md) for detailed documentation on plotting capabilities.
 
 ## Main Classes
 
