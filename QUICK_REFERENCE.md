@@ -19,7 +19,8 @@ extent = get_geotiff_extent(argus_tif_path)
 coord_system = detect_argus_coordinate_system(extent)
 
 if coord_system == 'state_plane':
-    # Convert State Plane to lon/lat
+    # Convert State Plane to lon/lat (pseudocode: see examples/test_wave_and_imagery.py
+    # for the actual conversion using gp.FRFcoord and building argus_extent)
     argus_extent = convert_to_lonlat(extent)
 else:
     # Already lon/lat - use directly  
