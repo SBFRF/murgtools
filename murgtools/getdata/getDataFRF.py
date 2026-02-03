@@ -969,9 +969,9 @@ class getObs:
             # return everything found in window
             idx = self.bathydataindex
         elif np.size(self.bathydataindex) == 1 and self.bathydataindex is not None:
-            # identifed single survey point that fits time window
+            # identified single survey point that fits time window
             idx = self.bathydataindex
-        elif ((np.size(self.bathydataindex) < 1) or (self.bathydataindex is None)) and method == 1:
+        elif ((self.bathydataindex is None) or (np.size(self.bathydataindex) < 1)) and method == 1:
             # there's no exact bathy match so find the closest in history
             # find the max negative number where the negative numbers are historical and the max would be the
             # closest historical
@@ -979,7 +979,7 @@ class getObs:
             val = (max([n for n in (temp - self.epochd1) if n < 0]))
             idx = np.where((temp - self.epochd1) == val)[0][0] + indexRef[0]
             
-        elif ((np.size(self.bathydataindex) < 1) or (self.bathydataindex is None)) and method == 0:
+        elif ((self.bathydataindex is None) or (np.size(self.bathydataindex) < 1)) and method == 0:
             # no exact bathy, find the closest in time
             temp = self.ncfile['time'][indexRef[0]:indexRef[1]]
             idx = np.argmin(np.abs(temp - self.epochd1)) + indexRef[0]  # closest in time
