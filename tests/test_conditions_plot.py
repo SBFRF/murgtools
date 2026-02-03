@@ -210,7 +210,7 @@ class TestConditionsPlot:
         start_date = dt.datetime(2023, 6, 1)
         end_date = dt.datetime(2023, 6, 30)
         
-        fig, axes = conditions_plot(time_list, start_date, end_date, ofname='test_output.png')
+        fig, _ = conditions_plot(time_list, start_date, end_date, ofname='test_output.png')
         
         # Verify savefig was called
         mock_savefig.assert_called_once()
