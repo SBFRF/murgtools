@@ -1263,8 +1263,9 @@ class TestGeotiffCRS:
         import numpy as np
         
         # Create a temporary GeoTIFF with State Plane coordinates
-        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
-            tmp_path = tmp.name
+        tmp = tempfile.NamedTemporaryFile(suffix='.tif', delete=False)
+        tmp_path = tmp.name
+        tmp.close()
         
         try:
             mock_image = np.zeros((100, 200, 3), dtype=np.uint8)
@@ -1296,8 +1297,9 @@ class TestGeotiffCRS:
         import numpy as np
         
         # Create a temporary GeoTIFF with lon/lat coordinates
-        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
-            tmp_path = tmp.name
+        tmp = tempfile.NamedTemporaryFile(suffix='.tif', delete=False)
+        tmp_path = tmp.name
+        tmp.close()
         
         try:
             mock_image = np.zeros((100, 200, 3), dtype=np.uint8)
@@ -1329,8 +1331,9 @@ class TestGeotiffCRS:
         import numpy as np
         
         # Create a temporary GeoTIFF with unrecognized coordinates
-        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
-            tmp_path = tmp.name
+        tmp = tempfile.NamedTemporaryFile(suffix='.tif', delete=False)
+        tmp_path = tmp.name
+        tmp.close()
         
         try:
             mock_image = np.zeros((100, 200, 3), dtype=np.uint8)
@@ -1360,8 +1363,9 @@ class TestGeotiffCRS:
         import tifffile
         import numpy as np
         
-        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
-            tmp_path = tmp.name
+        tmp = tempfile.NamedTemporaryFile(suffix='.tif', delete=False)
+        tmp_path = tmp.name
+        tmp.close()
         
         try:
             mock_image = np.zeros((100, 200, 3), dtype=np.uint8)

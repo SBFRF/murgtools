@@ -14,6 +14,10 @@ import numpy as np
 from murgtools.getdata import getObs, getSatelliteImagery, findArgusImagery, get_geotiff_extent, detect_geotiff_crs
 from murgtools.utils import geoprocess as gp
 
+# Threshold for suspicious extent size (degrees)
+# More than 1 degree of lon/lat span is suspicious for FRF imagery
+SUSPICIOUS_EXTENT_THRESHOLD_DEGREES = 1.0
+
 
 def main():
     # Define time range: last 30 days with clean datetime boundaries
@@ -161,7 +165,7 @@ def main():
                 lon_range = argus_extent[1] - argus_extent[0]
                 lat_range = argus_extent[3] - argus_extent[2]
 
-                if lon_range > 1 or lat_range > 1:  # More than 1 degree is suspicious
+                if lon_range > SUSPICIOUS_EXTENT_THRESHOLD_DEGREES or lat_range > SUSPICIOUS_EXTENT_THRESHOLD_DEGREES:
                     print(f"  ⚠ Warning: Extent spans {lon_range:.3f}° lon, {lat_range:.3f}° lat")
                     print(f"  ⚠ This seems too large, coordinates may be incorrect")
     except Exception as e:
