@@ -11,7 +11,7 @@ This script will:
 
 import datetime as DT
 import numpy as np
-from murgtools.getdata import getSatelliteImagery, findArgusImagery, get_geotiff_extent
+from murgtools.getdata import getSatelliteImagery, findArgusImagery, get_geotiff_extent, detect_geotiff_crs
 from murgtools.utils import geoprocess as gp
 import tempfile
 
@@ -98,12 +98,13 @@ def diagnose_coordinates():
             print(f"  Bottom: {raw_extent[2]:.6f}")
             print(f"  Top:    {raw_extent[3]:.6f}")
             
-            # Determine coordinate system
+            # Determine coordinate system using the new function
             print(f"\nCoordinate System Detection:")
             left, right, bottom, top = raw_extent
             
-            # Check if values look like State Plane
-            is_state_plane = (left > 800000 and bottom > 200000)
+            # Use the detect_geotiff_crs function
+            crs_type = detect_geotiff_crs(tmp_path)
+            is_state_plane = (crs_type == 'state_plane')
             
             if is_state_plane:
                 print(f"  ✓ DETECTED: North Carolina State Plane (NAD83)")
