@@ -34,12 +34,21 @@ def bin_data(data_to_be_binned, bin_size=0.1):
         >>> data = np.array([0.5, 1.0, 1.5, 2.0])
         >>> indices, bins = bin_data(data, bin_size=0.5)
     """
+    # Convert input to numpy array for consistent handling
+    data_array = np.asarray(data_to_be_binned)
+
+    # Validate that there is at least one non-NaN value to bin
+    if data_array.size == 0 or not np.any(~np.isnan(data_array)):
+        raise ValueError(
+            "bin_data: data_to_be_binned must contain at least one non-NaN value."
+        )
+
     # Ensure the upper bound includes all data by adding bin_size
-    bins = np.arange(np.nanmin(data_to_be_binned), 
-                     np.ceil(np.nanmax(data_to_be_binned)) + bin_size, 
+    bins = np.arange(np.nanmin(data_array),
+                     np.ceil(np.nanmax(data_array)) + bin_size,
                      bin_size)
     # np.digitize returns 1-based indices, convert to 0-based for Python consistency
-    bin_indices = np.digitize(data_to_be_binned, bins=bins, right=False) - 1
+    bin_indices = np.digitize(data_array, bins=bins, right=False) - 1
     return bin_indices, bins
 
 
