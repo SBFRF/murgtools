@@ -1250,3 +1250,148 @@ class TestGetArgusPixelIntensity:
 
             assert result is not None
             np.testing.assert_array_equal(result['intensity'][0], [255, 128, 64])
+
+
+class TestGeotiffCRS:
+    """Tests for GeoTIFF coordinate system detection and extent extraction."""
+
+    def test_detect_geotiff_crs_state_plane(self):
+        """Test detection of NC State Plane coordinates."""
+        from murgtools.getdata.getDataFRF import detect_geotiff_crs
+        import tempfile
+        import tifffile
+        import numpy as np
+        
+        # Create a temporary GeoTIFF with State Plane coordinates
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+        
+        try:
+            mock_image = np.zeros((100, 200, 3), dtype=np.uint8)
+            
+            # NC State Plane coordinates (typical FRF values)
+            # Easting: ~901,000 meters, Northing: ~274,000 meters
+            tiepoint = [0.0, 0.0, 0.0, 901000.0, 274000.0, 0.0]
+            scale = [10.0, 10.0, 0.0]  # 10 meters per pixel
+            
+            extratags = [
+                (33922, 'd', 6, tiepoint, True),
+                (33550, 'd', 3, scale, True),
+            ]
+            
+            tifffile.imwrite(tmp_path, mock_image, extratags=extratags)
+            
+            crs = detect_geotiff_crs(tmp_path)
+            assert crs == 'state_plane'
+        finally:
+            import os
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+    def test_detect_geotiff_crs_lonlat(self):
+        """Test detection of lon/lat geographic coordinates."""
+        from murgtools.getdata.getDataFRF import detect_geotiff_crs
+        import tempfile
+        import tifffile
+        import numpy as np
+        
+        # Create a temporary GeoTIFF with lon/lat coordinates
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+        
+        try:
+            mock_image = np.zeros((100, 200, 3), dtype=np.uint8)
+            
+            # Geographic coordinates (typical FRF values)
+            # Longitude: ~-75.75, Latitude: ~36.18
+            tiepoint = [0.0, 0.0, 0.0, -75.75, 36.18, 0.0]
+            scale = [0.0001, 0.0001, 0.0]  # ~10 meters per pixel at this latitude
+            
+            extratags = [
+                (33922, 'd', 6, tiepoint, True),
+                (33550, 'd', 3, scale, True),
+            ]
+            
+            tifffile.imwrite(tmp_path, mock_image, extratags=extratags)
+            
+            crs = detect_geotiff_crs(tmp_path)
+            assert crs == 'lonlat'
+        finally:
+            import os
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+    def test_detect_geotiff_crs_unknown(self):
+        """Test detection of unknown coordinate system."""
+        from murgtools.getdata.getDataFRF import detect_geotiff_crs
+        import tempfile
+        import tifffile
+        import numpy as np
+        
+        # Create a temporary GeoTIFF with unrecognized coordinates
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+        
+        try:
+            mock_image = np.zeros((100, 200, 3), dtype=np.uint8)
+            
+            # Random coordinates that don't match known systems
+            tiepoint = [0.0, 0.0, 0.0, 5000.0, 3000.0, 0.0]
+            scale = [10.0, 10.0, 0.0]
+            
+            extratags = [
+                (33922, 'd', 6, tiepoint, True),
+                (33550, 'd', 3, scale, True),
+            ]
+            
+            tifffile.imwrite(tmp_path, mock_image, extratags=extratags)
+            
+            crs = detect_geotiff_crs(tmp_path)
+            assert crs == 'unknown'
+        finally:
+            import os
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+    def test_get_geotiff_extent_format(self):
+        """Test that get_geotiff_extent returns correct format."""
+        from murgtools.getdata.getDataFRF import get_geotiff_extent
+        import tempfile
+        import tifffile
+        import numpy as np
+        
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+        
+        try:
+            mock_image = np.zeros((100, 200, 3), dtype=np.uint8)
+            
+            # State Plane coordinates
+            tiepoint = [0.0, 0.0, 0.0, 901000.0, 274000.0, 0.0]
+            scale = [10.0, 10.0, 0.0]
+            
+            extratags = [
+                (33922, 'd', 6, tiepoint, True),
+                (33550, 'd', 3, scale, True),
+            ]
+            
+            tifffile.imwrite(tmp_path, mock_image, extratags=extratags)
+            
+            extent = get_geotiff_extent(tmp_path)
+            
+            # Verify extent format: [left, right, bottom, top]
+            assert len(extent) == 4
+            assert extent[0] < extent[1]  # left < right
+            assert extent[2] < extent[3]  # bottom < top
+            
+            # Verify calculated values
+            # left = 901000, right = 901000 + 200*10 = 903000
+            # top = 274000, bottom = 274000 - 100*10 = 273000
+            assert extent[0] == 901000.0
+            assert extent[1] == 903000.0
+            assert extent[2] == 273000.0
+            assert extent[3] == 274000.0
+        finally:
+            import os
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
