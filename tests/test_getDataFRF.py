@@ -339,11 +339,13 @@ class TestGetGeoTiffExtent:
                 transformer.transform(500100.0, 3999800.0),
                 transformer.transform(500100.0, 4000000.0),
             ]
+            lons = [lon for lon, _ in corners]
+            lats = [lat for _, lat in corners]
             expected = [
-                min(lon for lon, _ in corners),
-                max(lon for lon, _ in corners),
-                min(lat for _, lat in corners),
-                max(lat for _, lat in corners),
+                min(lons),
+                max(lons),
+                min(lats),
+                max(lats),
             ]
 
             assert extent == pytest.approx(expected)

@@ -3383,10 +3383,10 @@ def get_geotiff_extent(filepath, to_latlon=False):
         # Compute extent: [left, right, bottom, top]
         left = tiepoint[3]
         right = left + width * scale[0]
-        top = tiepoint[4]
-        y_edge = top - height * scale[1]
-        bottom = min(top, y_edge)
-        top = max(top, y_edge)
+        top_edge = tiepoint[4]
+        bottom_edge = top_edge - height * scale[1]
+        bottom = min(top_edge, bottom_edge)
+        top = max(top_edge, bottom_edge)
 
         if not to_latlon:
             return [left, right, bottom, top]
