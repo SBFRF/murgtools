@@ -3385,12 +3385,15 @@ def get_geotiff_extent(filepath, to_latlon=False):
         right = left + width * scale[0]
         top = tiepoint[4]
         y_edge = top - height * scale[1]
-        bottom, top = sorted((top, y_edge))
+        bottom = min(top, y_edge)
+        top = max(top, y_edge)
 
         if not to_latlon:
             return [left, right, bottom, top]
 
         geotiff_tags = page.geotiff_tags or {}
+        # Projected GeoTIFFs store their CRS in ProjectedCSTypeGeoKey, while
+        # geographic lon/lat GeoTIFFs use GeographicTypeGeoKey.
         epsg = geotiff_tags.get('ProjectedCSTypeGeoKey')
         if epsg is None:
             epsg = geotiff_tags.get('GeographicTypeGeoKey')
