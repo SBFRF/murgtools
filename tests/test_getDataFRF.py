@@ -311,6 +311,7 @@ class TestGetGeoTiffExtent:
     def test_converts_projected_extent_to_latlon(self):
         """Test projected GeoTIFF extent conversion to lon/lat."""
         image = np.zeros((20, 10), dtype=np.uint8)
+        # GeoKey Directory: (version, revision, minor_rev, num_keys, key_id, location, count, value...)
         geokey_dir = (1, 1, 0, 3, 1024, 0, 1, 1, 1025, 0, 1, 1, 3072, 0, 1, 32618)
         tiepoint = [0.0, 0.0, 0.0, 500000.0, 4000000.0, 0.0]
         scale = [10.0, 10.0, 0.0]

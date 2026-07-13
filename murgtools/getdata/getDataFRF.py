@@ -3396,7 +3396,10 @@ def get_geotiff_extent(filepath, to_latlon=False):
         if hasattr(epsg, 'value'):
             epsg = epsg.value
         if epsg is None:
-            raise ValueError(f"GeoTIFF CRS metadata not found in {filepath}")
+            raise ValueError(
+                f"GeoTIFF CRS metadata (ProjectedCSTypeGeoKey or GeographicTypeGeoKey) "
+                f"not found in {filepath}"
+            )
 
         transformer = pyproj.Transformer.from_crs(f"EPSG:{epsg}", "EPSG:4326", always_xy=True)
         corners = [
