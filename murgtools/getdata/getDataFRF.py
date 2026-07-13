@@ -3343,7 +3343,7 @@ class getDataTestBed:
         return mod
 
 
-def get_geotiff_extent(filepath):
+def get_geotiff_extent(filepath, to_latlon=False):
     """Extract matplotlib extent from GeoTIFF using tifffile.
 
     Parses GeoTIFF tags (ModelTiepointTag and ModelPixelScaleTag) to compute
@@ -3351,33 +3351,62 @@ def get_geotiff_extent(filepath):
 
     Args:
         filepath (str): Path to GeoTIFF file.
+        to_latlon (bool, optional): When True, convert projected GeoTIFF bounds
+            to lon/lat using the GeoTIFF CRS metadata. Defaults to False.
 
     Returns:
-        list: [left, right, bottom, top] extent in geographic coordinates
-            (typically lon/lat or projected coordinates depending on the GeoTIFF).
+        list: [left, right, bottom, top] extent in the GeoTIFF native
+            coordinates by default, or [lon_min, lon_max, lat_min, lat_max]
+            when ``to_latlon`` is True.
 
     Raises:
         KeyError: If required GeoTIFF tags are not present in the file.
+        ValueError: If ``to_latlon`` is True and the GeoTIFF CRS metadata
+            cannot be determined.
 
     Example:
         >>> extent = get_geotiff_extent('/path/to/image.tif')
         >>> plt.imshow(image, extent=extent)
+        >>> ll_extent = get_geotiff_extent('/path/to/image.tif', to_latlon=True)
 
     """
+    import pyproj
     import tifffile
 
     with tifffile.TiffFile(filepath) as tif:
-        tags = tif.pages[0].tags
+        page = tif.pages[0]
+        tags = page.tags
         # GeoTIFF tags: 33922=ModelTiepointTag, 33550=ModelPixelScaleTag
         tiepoint = tags[33922].value  # (i, j, k, x, y, z)
         scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
-        height, width = tif.pages[0].shape[:2]
+        height, width = page.shape[:2]
         # Compute extent: [left, right, bottom, top]
         left = tiepoint[3]
-        top = tiepoint[4]
         right = left + width * scale[0]
-        bottom = top - height * scale[1]
-        return [left, right, bottom, top]
+        top = tiepoint[4]
+        edge_y = top - height * scale[1]
+        bottom, top = sorted((top, edge_y))
+
+        if not to_latlon:
+            return [min(left, right), max(left, right), bottom, top]
+
+        geotiff_tags = page.geotiff_tags or {}
+        epsg = geotiff_tags.get('ProjectedCSTypeGeoKey') or geotiff_tags.get('GeographicTypeGeoKey')
+        if hasattr(epsg, 'value'):
+            epsg = epsg.value
+        if epsg is None:
+            raise ValueError(f"GeoTIFF CRS metadata not found in {filepath}")
+
+        transformer = pyproj.Transformer.from_crs(f"EPSG:{epsg}", "EPSG:4326", always_xy=True)
+        corners = [
+            transformer.transform(left, bottom),
+            transformer.transform(left, top),
+            transformer.transform(right, bottom),
+            transformer.transform(right, top),
+        ]
+        lons = [corner[0] for corner in corners]
+        lats = [corner[1] for corner in corners]
+        return [min(lons), max(lons), min(lats), max(lats)]
 
 
 def getArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=True):

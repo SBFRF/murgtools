@@ -279,6 +279,85 @@ class TestGetArgusImagery:
             assert result is None
 
 
+class TestGetGeoTiffExtent:
+    """Tests for the get_geotiff_extent function."""
+
+    def test_returns_native_extent(self):
+        """Test native GeoTIFF extent extraction."""
+        import tempfile
+        import tifffile
+
+        from murgtools.getdata.getDataFRF import get_geotiff_extent
+
+        image = np.zeros((20, 10), dtype=np.uint8)
+        tiepoint = [0.0, 0.0, 0.0, 900500.0, 276000.0, 0.0]
+        scale = [10.0, 10.0, 0.0]
+
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            tifffile.imwrite(
+                tmp_path,
+                image,
+                extratags=[
+                    (33922, 'd', 6, tiepoint, True),
+                    (33550, 'd', 3, scale, True),
+                ]
+            )
+
+            assert get_geotiff_extent(tmp_path) == [900500.0, 900600.0, 275800.0, 276000.0]
+        finally:
+            os.unlink(tmp_path)
+
+    def test_converts_projected_extent_to_latlon(self):
+        """Test projected GeoTIFF extent conversion to lon/lat."""
+        import tempfile
+        import tifffile
+        from pyproj import Transformer
+
+        from murgtools.getdata.getDataFRF import get_geotiff_extent
+
+        image = np.zeros((20, 10), dtype=np.uint8)
+        geokey_dir = (1, 1, 0, 3, 1024, 0, 1, 1, 1025, 0, 1, 1, 3072, 0, 1, 32618)
+        tiepoint = [0.0, 0.0, 0.0, 500000.0, 4000000.0, 0.0]
+        scale = [10.0, 10.0, 0.0]
+
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            tifffile.imwrite(
+                tmp_path,
+                image,
+                extratags=[
+                    (33922, 'd', 6, tiepoint, True),
+                    (33550, 'd', 3, scale, True),
+                    (34735, 'H', len(geokey_dir), geokey_dir, True),
+                ]
+            )
+
+            extent = get_geotiff_extent(tmp_path, to_latlon=True)
+
+            transformer = Transformer.from_crs('EPSG:32618', 'EPSG:4326', always_xy=True)
+            corners = [
+                transformer.transform(500000.0, 3999800.0),
+                transformer.transform(500000.0, 4000000.0),
+                transformer.transform(500100.0, 3999800.0),
+                transformer.transform(500100.0, 4000000.0),
+            ]
+            expected = [
+                min(lon for lon, _ in corners),
+                max(lon for lon, _ in corners),
+                min(lat for _, lat in corners),
+                max(lat for _, lat in corners),
+            ]
+
+            assert extent == pytest.approx(expected)
+        finally:
+            os.unlink(tmp_path)
+
+
 class TestThreadGetArgusImagery:
     """Tests for the threadGetArgusImagery function."""
 
