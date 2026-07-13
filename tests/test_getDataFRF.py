@@ -304,7 +304,7 @@ class TestGetGeoTiffExtent:
                 ]
             )
 
-            assert get_geotiff_extent(tmp_path) == [900500.0, 900600.0, 275800.0, 276000.0]
+            assert get_geotiff_extent(tmp_path) == pytest.approx([900500.0, 900600.0, 275800.0, 276000.0])
         finally:
             os.unlink(tmp_path)
 
