@@ -1,12 +1,15 @@
 """Unit tests for getDataFRF module."""
 import datetime as DT
 import os
+import tempfile
 import numpy as np
+import tifffile
 import pytest
 import netCDF4 as nc
 from unittest.mock import MagicMock, patch, PropertyMock
+from pyproj import Transformer
 
-from murgtools.getdata.getDataFRF import gettime, removeDuplicatesFromDictionary
+from murgtools.getdata.getDataFRF import get_geotiff_extent, gettime, removeDuplicatesFromDictionary
 from murgtools.exceptions import InvalidGaugeError
 
 
@@ -284,11 +287,6 @@ class TestGetGeoTiffExtent:
 
     def test_returns_native_extent(self):
         """Test native GeoTIFF extent extraction."""
-        import tempfile
-        import tifffile
-
-        from murgtools.getdata.getDataFRF import get_geotiff_extent
-
         image = np.zeros((20, 10), dtype=np.uint8)
         tiepoint = [0.0, 0.0, 0.0, 900500.0, 276000.0, 0.0]
         scale = [10.0, 10.0, 0.0]
@@ -312,12 +310,6 @@ class TestGetGeoTiffExtent:
 
     def test_converts_projected_extent_to_latlon(self):
         """Test projected GeoTIFF extent conversion to lon/lat."""
-        import tempfile
-        import tifffile
-        from pyproj import Transformer
-
-        from murgtools.getdata.getDataFRF import get_geotiff_extent
-
         image = np.zeros((20, 10), dtype=np.uint8)
         geokey_dir = (1, 1, 0, 3, 1024, 0, 1, 1, 1025, 0, 1, 1, 3072, 0, 1, 32618)
         tiepoint = [0.0, 0.0, 0.0, 500000.0, 4000000.0, 0.0]

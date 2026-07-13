@@ -3384,14 +3384,15 @@ def get_geotiff_extent(filepath, to_latlon=False):
         left = tiepoint[3]
         right = left + width * scale[0]
         top = tiepoint[4]
-        edge_y = top - height * scale[1]
-        bottom, top = sorted((top, edge_y))
+        y_edge = top - height * scale[1]
+        bottom, top = sorted((top, y_edge))
 
         if not to_latlon:
             return [min(left, right), max(left, right), bottom, top]
 
         geotiff_tags = page.geotiff_tags or {}
         epsg = geotiff_tags.get('ProjectedCSTypeGeoKey') or geotiff_tags.get('GeographicTypeGeoKey')
+        # tifffile may expose GeoTIFF keys as enums, so unwrap the numeric EPSG value when needed.
         if hasattr(epsg, 'value'):
             epsg = epsg.value
         if epsg is None:
