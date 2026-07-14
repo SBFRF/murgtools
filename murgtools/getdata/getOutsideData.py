@@ -532,7 +532,24 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
         actual_west, actual_south = from_utm.transform(actual_utm_west, actual_utm_south)
         actual_east, actual_north = from_utm.transform(actual_utm_east, actual_utm_north)
 
-        resolution_m = abs(scale_x)  # GeoTIFF scale magnitude in meters for UTM
+        # Compute resolution in meters, accounting for CRS units
+        # UTM (326xx/327xx) uses meters, geographic CRS uses degrees
+        from pyproj import CRS
+        crs = CRS.from_epsg(epsg)
+        crs_unit = crs.axis_info[0].unit_name if crs.axis_info else 'metre'
+        if crs_unit in ('metre', 'meter', 'm'):
+            resolution_m = abs(scale_x)
+        elif crs_unit in ('degree', 'degrees'):
+            # Convert degrees to meters at image center latitude
+            center_lat = (actual_north + actual_south) / 2
+            meters_per_deg = 111320 * np.cos(np.radians(center_lat))
+            resolution_m = abs(scale_x) * meters_per_deg
+        elif crs_unit in ('foot', 'US survey foot', 'ft'):
+            # Convert feet to meters
+            resolution_m = abs(scale_x) * 0.3048
+        else:
+            # Default: assume meters for unknown units
+            resolution_m = abs(scale_x)
     else:
         # Fallback: use linear lat/lon mapping (less accurate but works without GeoTIFF metadata)
         px_per_deg_x = w / (scene_bbox[2] - scene_bbox[0])
