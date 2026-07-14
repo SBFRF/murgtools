@@ -407,6 +407,36 @@ class TestGetGeoTiffExtent:
         finally:
             os.unlink(tmp_path)
 
+    def test_handles_nonzero_tiepoint_pixel(self):
+        """Test GeoTIFF extent when tiepoint references non-(0,0) pixel."""
+        image = np.zeros((200, 100), dtype=np.uint8)
+        # Tiepoint at pixel (10, 20) -> model coords (900510, 275980)
+        # With scale (1, 1), pixel (0,0) should be at:
+        #   origin_x = 900510 - 10 * 1 = 900500
+        #   origin_y = 275980 + 20 * 1 = 276000
+        # So extent should be [900500, 900600, 275800, 276000]
+        tiepoint = [10.0, 20.0, 0.0, 900510.0, 275980.0, 0.0]
+        scale = [1.0, 1.0, 0.0]
+
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            tifffile.imwrite(
+                tmp_path,
+                image,
+                extratags=[
+                    (33922, 'd', 6, tiepoint, True),
+                    (33550, 'd', 3, scale, True),
+                ]
+            )
+
+            extent = get_geotiff_extent(tmp_path)
+            # Verify extent is computed from pixel (0,0), not the tiepoint pixel
+            assert extent == pytest.approx([900500.0, 900600.0, 275800.0, 276000.0])
+        finally:
+            os.unlink(tmp_path)
+
 
 class TestThreadGetArgusImagery:
     """Tests for the threadGetArgusImagery function."""

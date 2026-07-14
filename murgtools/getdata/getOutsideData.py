@@ -396,6 +396,8 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
     tiepoint = None
     scale = None
     epsg = None
+    origin_x = None  # Model-space origin for pixel (0,0)
+    origin_y = None
 
     try:
         image = tifffile.imread(tmp_path)
@@ -409,11 +411,16 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
                 scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
                 img_h, img_w = tif.pages[0].shape[:2]
 
+                # Compute model-space origin for pixel (0,0)
+                # Tiepoint specifies model coords (x,y) for raster pixel (i,j)
+                origin_x = tiepoint[3] - tiepoint[0] * scale[0]
+                origin_y = tiepoint[4] + tiepoint[1] * scale[1]
+
                 # UTM bounds - normalize with min/max to handle negative scale
-                x_edge1 = tiepoint[3]
-                x_edge2 = tiepoint[3] + img_w * scale[0]
-                y_edge1 = tiepoint[4]
-                y_edge2 = tiepoint[4] - img_h * scale[1]
+                x_edge1 = origin_x
+                x_edge2 = origin_x + img_w * scale[0]
+                y_edge1 = origin_y
+                y_edge2 = origin_y - img_h * scale[1]
                 utm_left = min(x_edge1, x_edge2)
                 utm_right = max(x_edge1, x_edge2)
                 utm_bottom = min(y_edge1, y_edge2)
@@ -489,18 +496,17 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
         bbox_utm_south = min(c[1] for c in corners_utm)
         bbox_utm_north = max(c[1] for c in corners_utm)
 
-        # Use GeoTIFF origin and scale for pixel calculation
-        utm_origin_x = tiepoint[3]
-        utm_origin_y = tiepoint[4]
+        # Use GeoTIFF origin (for pixel 0,0) and scale for pixel calculation
         scale_x = scale[0]
         scale_y = scale[1]
 
         # Compute pixel indices using floor/ceil to include full bbox
         # Handle negative scale by computing both edges and normalizing
-        px_west = (bbox_utm_west - utm_origin_x) / scale_x
-        px_east = (bbox_utm_east - utm_origin_x) / scale_x
-        px_north = (utm_origin_y - bbox_utm_north) / scale_y
-        px_south = (utm_origin_y - bbox_utm_south) / scale_y
+        # origin_x/origin_y are model coords for pixel (0,0), computed from tiepoint
+        px_west = (bbox_utm_west - origin_x) / scale_x
+        px_east = (bbox_utm_east - origin_x) / scale_x
+        px_north = (origin_y - bbox_utm_north) / scale_y
+        px_south = (origin_y - bbox_utm_south) / scale_y
 
         # Normalize pixel indices (handle negative scale)
         x1 = math.floor(min(px_west, px_east))
@@ -516,12 +522,11 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
             return None
 
         # Compute actual UTM bounds of cropped region
-        # Use the normalized image coordinates (utm_left/right/bottom/top from earlier)
-        # to ensure consistency regardless of scale sign
-        actual_utm_x1 = utm_origin_x + x1 * scale_x
-        actual_utm_x2 = utm_origin_x + x2 * scale_x
-        actual_utm_y1 = utm_origin_y - y1 * scale_y
-        actual_utm_y2 = utm_origin_y - y2 * scale_y
+        # Use origin_x/origin_y (model coords for pixel 0,0) for consistency
+        actual_utm_x1 = origin_x + x1 * scale_x
+        actual_utm_x2 = origin_x + x2 * scale_x
+        actual_utm_y1 = origin_y - y1 * scale_y
+        actual_utm_y2 = origin_y - y2 * scale_y
         actual_utm_west = min(actual_utm_x1, actual_utm_x2)
         actual_utm_east = max(actual_utm_x1, actual_utm_x2)
         actual_utm_south = min(actual_utm_y1, actual_utm_y2)

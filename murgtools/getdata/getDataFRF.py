@@ -3380,13 +3380,20 @@ def get_geotiff_extent(filepath, to_latlon=False):
         tiepoint = tags[33922].value  # (i, j, k, x, y, z)
         scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
         height, width = page.shape[:2]
+
+        # Compute model-space origin for pixel (0,0)
+        # Tiepoint specifies model coords (x,y) for raster pixel (i,j)
+        # origin_x = x - i * scaleX, origin_y = y + j * scaleY
+        origin_x = tiepoint[3] - tiepoint[0] * scale[0]
+        origin_y = tiepoint[4] + tiepoint[1] * scale[1]
+
         # Compute extent: [left, right, bottom, top]
         # Handle both positive and negative scale values by computing both
         # edges and normalizing with min/max
-        x_edge1 = tiepoint[3]
-        x_edge2 = tiepoint[3] + width * scale[0]
-        y_edge1 = tiepoint[4]
-        y_edge2 = tiepoint[4] - height * scale[1]
+        x_edge1 = origin_x
+        x_edge2 = origin_x + width * scale[0]
+        y_edge1 = origin_y
+        y_edge2 = origin_y - height * scale[1]
         left = min(x_edge1, x_edge2)
         right = max(x_edge1, x_edge2)
         bottom = min(y_edge1, y_edge2)
