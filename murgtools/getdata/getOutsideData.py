@@ -409,26 +409,44 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
                 scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
                 img_h, img_w = tif.pages[0].shape[:2]
 
-                # UTM bounds
-                utm_left = tiepoint[3]
-                utm_right = tiepoint[3] + img_w * scale[0]
-                utm_top = tiepoint[4]
-                utm_bottom = tiepoint[4] - img_h * scale[1]
+                # UTM bounds - normalize with min/max to handle negative scale
+                x_edge1 = tiepoint[3]
+                x_edge2 = tiepoint[3] + img_w * scale[0]
+                y_edge1 = tiepoint[4]
+                y_edge2 = tiepoint[4] - img_h * scale[1]
+                utm_left = min(x_edge1, x_edge2)
+                utm_right = max(x_edge1, x_edge2)
+                utm_bottom = min(y_edge1, y_edge2)
+                utm_top = max(y_edge1, y_edge2)
 
-                # Determine UTM zone from GeoKey (tag 34737 contains projection info)
-                proj_str = tags.get(34737, None)
-                if proj_str:
-                    proj_str = proj_str.value
-                    # Parse UTM zone from string like "WGS 84 / UTM zone 18N"
-                    match = re.search(r'UTM zone (\d+)([NS])', str(proj_str))
-                    if match:
-                        zone = int(match.group(1))
-                        hemisphere = match.group(2)
-                        epsg = 32600 + zone if hemisphere == 'N' else 32700 + zone
-                    else:
-                        epsg = 32618
-                else:
-                    epsg = 32618  # Default to UTM zone 18N if no projection string
+                # Determine EPSG from GeoKeys first, then fall back to parsing projection string
+                page = tif.pages[0]
+                geotiff_tags = page.geotiff_tags or {}
+                epsg = (geotiff_tags.get('ProjectedCSTypeGeoKey') or
+                        geotiff_tags.get(3072) or
+                        geotiff_tags.get('GeographicTypeGeoKey') or
+                        geotiff_tags.get(2048))
+                if hasattr(epsg, 'value'):
+                    epsg = epsg.value
+                if isinstance(epsg, str):
+                    match = re.search(r'(\d+)', epsg)
+                    epsg = int(match.group(1)) if match else None
+
+                # Fall back to parsing projection string if GeoKeys not found
+                if epsg is None:
+                    proj_str = tags.get(34737, None)
+                    if proj_str:
+                        proj_str = proj_str.value
+                        # Parse UTM zone from string like "WGS 84 / UTM zone 18N"
+                        match = re.search(r'UTM zone (\d+)([NS])', str(proj_str))
+                        if match:
+                            zone = int(match.group(1))
+                            hemisphere = match.group(2)
+                            epsg = 32600 + zone if hemisphere == 'N' else 32700 + zone
+
+                # Default to UTM zone 18N only as last resort
+                if epsg is None:
+                    epsg = 32618
 
                 # Convert UTM corners to lat/lon
                 transformer = Transformer.from_crs(f'EPSG:{epsg}', 'EPSG:4326', always_xy=True)
@@ -478,10 +496,17 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
         scale_y = scale[1]
 
         # Compute pixel indices using floor/ceil to include full bbox
-        x1 = math.floor((bbox_utm_west - utm_origin_x) / scale_x)
-        x2 = math.ceil((bbox_utm_east - utm_origin_x) / scale_x)
-        y1 = math.floor((utm_origin_y - bbox_utm_north) / scale_y)
-        y2 = math.ceil((utm_origin_y - bbox_utm_south) / scale_y)
+        # Handle negative scale by computing both edges and normalizing
+        px_west = (bbox_utm_west - utm_origin_x) / scale_x
+        px_east = (bbox_utm_east - utm_origin_x) / scale_x
+        px_north = (utm_origin_y - bbox_utm_north) / scale_y
+        px_south = (utm_origin_y - bbox_utm_south) / scale_y
+
+        # Normalize pixel indices (handle negative scale)
+        x1 = math.floor(min(px_west, px_east))
+        x2 = math.ceil(max(px_west, px_east))
+        y1 = math.floor(min(px_north, px_south))
+        y2 = math.ceil(max(px_north, px_south))
 
         x1, x2 = max(0, x1), min(w, x2)
         y1, y2 = max(0, y1), min(h, y2)
@@ -491,17 +516,23 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
             return None
 
         # Compute actual UTM bounds of cropped region
-        actual_utm_west = utm_origin_x + x1 * scale_x
-        actual_utm_east = utm_origin_x + x2 * scale_x
-        actual_utm_north = utm_origin_y - y1 * scale_y
-        actual_utm_south = utm_origin_y - y2 * scale_y
+        # Use the normalized image coordinates (utm_left/right/bottom/top from earlier)
+        # to ensure consistency regardless of scale sign
+        actual_utm_x1 = utm_origin_x + x1 * scale_x
+        actual_utm_x2 = utm_origin_x + x2 * scale_x
+        actual_utm_y1 = utm_origin_y - y1 * scale_y
+        actual_utm_y2 = utm_origin_y - y2 * scale_y
+        actual_utm_west = min(actual_utm_x1, actual_utm_x2)
+        actual_utm_east = max(actual_utm_x1, actual_utm_x2)
+        actual_utm_south = min(actual_utm_y1, actual_utm_y2)
+        actual_utm_north = max(actual_utm_y1, actual_utm_y2)
 
         # Convert actual UTM bounds back to lat/lon
         from_utm = Transformer.from_crs(f'EPSG:{epsg}', 'EPSG:4326', always_xy=True)
         actual_west, actual_south = from_utm.transform(actual_utm_west, actual_utm_south)
         actual_east, actual_north = from_utm.transform(actual_utm_east, actual_utm_north)
 
-        resolution_m = scale_x  # GeoTIFF scale is in meters for UTM
+        resolution_m = abs(scale_x)  # GeoTIFF scale magnitude in meters for UTM
     else:
         # Fallback: use linear lat/lon mapping (less accurate but works without GeoTIFF metadata)
         px_per_deg_x = w / (scene_bbox[2] - scene_bbox[0])
