@@ -3392,14 +3392,27 @@ def get_geotiff_extent(filepath, to_latlon=False):
             return [left, right, bottom, top]
 
         geotiff_tags = page.geotiff_tags or {}
-        # Projected GeoTIFFs store their CRS in ProjectedCSTypeGeoKey, while
-        # geographic lon/lat GeoTIFFs use GeographicTypeGeoKey.
-        epsg = geotiff_tags.get('ProjectedCSTypeGeoKey')
-        if epsg is None:
-            epsg = geotiff_tags.get('GeographicTypeGeoKey')
-        # tifffile may expose GeoTIFF keys as enums, so unwrap the numeric EPSG value when needed.
+        # Projected GeoTIFFs store their CRS in ProjectedCSTypeGeoKey (3072), while
+        # geographic lon/lat GeoTIFFs use GeographicTypeGeoKey (2048).
+        # Support both string key names and integer key IDs.
+        epsg = (geotiff_tags.get('ProjectedCSTypeGeoKey') or
+                geotiff_tags.get(3072) or
+                geotiff_tags.get('GeographicTypeGeoKey') or
+                geotiff_tags.get(2048))
+
+        # tifffile may expose GeoTIFF keys as enums, so unwrap the numeric value.
         if hasattr(epsg, 'value'):
             epsg = epsg.value
+
+        # Handle string EPSG values like "EPSG:32618" or "32618"
+        if isinstance(epsg, str):
+            import re
+            match = re.search(r'(\d+)', epsg)
+            if match:
+                epsg = int(match.group(1))
+            else:
+                epsg = None
+
         if epsg is None:
             raise ValueError(
                 f"GeoTIFF CRS metadata (ProjectedCSTypeGeoKey or GeographicTypeGeoKey) "

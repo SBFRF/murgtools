@@ -391,6 +391,12 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
         for chunk in resp.iter_content(chunk_size=8192):
             tmp.write(chunk)
 
+    # Track whether we have GeoTIFF metadata for accurate UTM-based cropping
+    has_geotiff_metadata = False
+    tiepoint = None
+    scale = None
+    epsg = None
+
     try:
         image = tifffile.imread(tmp_path)
 
@@ -421,6 +427,8 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
                         epsg = 32600 + zone if hemisphere == 'N' else 32700 + zone
                     else:
                         epsg = 32618
+                else:
+                    epsg = 32618  # Default to UTM zone 18N if no projection string
 
                 # Convert UTM corners to lat/lon
                 transformer = Transformer.from_crs(f'EPSG:{epsg}', 'EPSG:4326', always_xy=True)
@@ -430,6 +438,7 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
 
                 # scene_bbox in lat/lon: [west, south, east, north]
                 scene_bbox = [tl_lon, br_lat, br_lon, tl_lat]
+                has_geotiff_metadata = True
         except KeyError:
             # Missing GeoTIFF georeferencing tags; fall back to STAC bbox if available.
             if isinstance(item, dict) and 'bbox' in item:
@@ -441,49 +450,75 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
     if collection == 'naip' and image.ndim == 3 and image.shape[-1] == 4:
         image = image[:, :, :3]  # Keep only RGB, drop NIR
 
-    # 7. Crop to bbox using UTM coordinates for accuracy
-    # The GeoTIFF stores UTM coordinates in tiepoint/scale, so we must convert
-    # the lat/lon bbox to UTM to get correct pixel indices.
+    # 7. Crop to bbox - use UTM coordinates if GeoTIFF metadata available
     h, w = image.shape[:2]
+    import math
 
-    # Create transformer from lat/lon to the image's UTM CRS
-    to_utm = Transformer.from_crs('EPSG:4326', f'EPSG:{epsg}', always_xy=True)
+    if has_geotiff_metadata:
+        # Use UTM coordinates for accurate pixel calculation
+        to_utm = Transformer.from_crs('EPSG:4326', f'EPSG:{epsg}', always_xy=True)
 
-    # Convert bbox corners to UTM
-    bbox_utm_west, _ = to_utm.transform(bbox[0], bbox[1])
-    bbox_utm_east, _ = to_utm.transform(bbox[2], bbox[1])
-    _, bbox_utm_south = to_utm.transform(bbox[0], bbox[1])
-    _, bbox_utm_north = to_utm.transform(bbox[0], bbox[3])
+        # Convert all 4 bbox corners to UTM and take min/max for proper bounds
+        corners_ll = [
+            (bbox[0], bbox[1]),  # SW
+            (bbox[0], bbox[3]),  # NW
+            (bbox[2], bbox[1]),  # SE
+            (bbox[2], bbox[3]),  # NE
+        ]
+        corners_utm = [to_utm.transform(lon, lat) for lon, lat in corners_ll]
+        bbox_utm_west = min(c[0] for c in corners_utm)
+        bbox_utm_east = max(c[0] for c in corners_utm)
+        bbox_utm_south = min(c[1] for c in corners_utm)
+        bbox_utm_north = max(c[1] for c in corners_utm)
 
-    # Use GeoTIFF origin and scale for pixel calculation
-    # tiepoint[3] = UTM easting of pixel (0,0)
-    # tiepoint[4] = UTM northing of pixel (0,0) (top of image)
-    # scale[0] = meters per pixel in X
-    # scale[1] = meters per pixel in Y
-    utm_origin_x = tiepoint[3]
-    utm_origin_y = tiepoint[4]
-    scale_x = scale[0]
-    scale_y = scale[1]
+        # Use GeoTIFF origin and scale for pixel calculation
+        utm_origin_x = tiepoint[3]
+        utm_origin_y = tiepoint[4]
+        scale_x = scale[0]
+        scale_y = scale[1]
 
-    # Compute pixel indices from UTM coordinates
-    x1 = int((bbox_utm_west - utm_origin_x) / scale_x)
-    x2 = int((bbox_utm_east - utm_origin_x) / scale_x)
-    y1 = int((utm_origin_y - bbox_utm_north) / scale_y)
-    y2 = int((utm_origin_y - bbox_utm_south) / scale_y)
+        # Compute pixel indices using floor/ceil to include full bbox
+        x1 = math.floor((bbox_utm_west - utm_origin_x) / scale_x)
+        x2 = math.ceil((bbox_utm_east - utm_origin_x) / scale_x)
+        y1 = math.floor((utm_origin_y - bbox_utm_north) / scale_y)
+        y2 = math.ceil((utm_origin_y - bbox_utm_south) / scale_y)
 
-    x1, x2 = max(0, x1), min(w, x2)
-    y1, y2 = max(0, y1), min(h, y2)
+        x1, x2 = max(0, x1), min(w, x2)
+        y1, y2 = max(0, y1), min(h, y2)
 
-    # Compute actual UTM bounds of cropped region (for accurate extent)
-    actual_utm_west = utm_origin_x + x1 * scale_x
-    actual_utm_east = utm_origin_x + x2 * scale_x
-    actual_utm_north = utm_origin_y - y1 * scale_y
-    actual_utm_south = utm_origin_y - y2 * scale_y
+        # Compute actual UTM bounds of cropped region
+        actual_utm_west = utm_origin_x + x1 * scale_x
+        actual_utm_east = utm_origin_x + x2 * scale_x
+        actual_utm_north = utm_origin_y - y1 * scale_y
+        actual_utm_south = utm_origin_y - y2 * scale_y
 
-    # Convert actual UTM bounds back to lat/lon
-    from_utm = Transformer.from_crs(f'EPSG:{epsg}', 'EPSG:4326', always_xy=True)
-    actual_west, actual_south = from_utm.transform(actual_utm_west, actual_utm_south)
-    actual_east, actual_north = from_utm.transform(actual_utm_east, actual_utm_north)
+        # Convert actual UTM bounds back to lat/lon
+        from_utm = Transformer.from_crs(f'EPSG:{epsg}', 'EPSG:4326', always_xy=True)
+        actual_west, actual_south = from_utm.transform(actual_utm_west, actual_utm_south)
+        actual_east, actual_north = from_utm.transform(actual_utm_east, actual_utm_north)
+
+        resolution_m = scale_x  # GeoTIFF scale is in meters for UTM
+    else:
+        # Fallback: use linear lat/lon mapping (less accurate but works without GeoTIFF metadata)
+        px_per_deg_x = w / (scene_bbox[2] - scene_bbox[0])
+        px_per_deg_y = h / (scene_bbox[3] - scene_bbox[1])
+
+        x1 = math.floor((bbox[0] - scene_bbox[0]) * px_per_deg_x)
+        x2 = math.ceil((bbox[2] - scene_bbox[0]) * px_per_deg_x)
+        y1 = math.floor((scene_bbox[3] - bbox[3]) * px_per_deg_y)
+        y2 = math.ceil((scene_bbox[3] - bbox[1]) * px_per_deg_y)
+
+        x1, x2 = max(0, x1), min(w, x2)
+        y1, y2 = max(0, y1), min(h, y2)
+
+        # Compute actual bounds from pixel indices
+        actual_west = scene_bbox[0] + x1 / px_per_deg_x
+        actual_east = scene_bbox[0] + x2 / px_per_deg_x
+        actual_north = scene_bbox[3] - y1 / px_per_deg_y
+        actual_south = scene_bbox[3] - y2 / px_per_deg_y
+
+        meters_per_deg = 111320 * np.cos(np.radians(np.mean(lats)))
+        resolution_m = (actual_east - actual_west) / (x2 - x1) * meters_per_deg
 
     image = image[y1:y2, x1:x2]
 
@@ -492,12 +527,8 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
         image = np.clip(image / image.max() * 255, 0, 255).astype(np.uint8)
 
     # 9. Compute georeferencing before rotation
-    # Use actual bounds for accurate deg_per_px
     deg_per_px_x = (actual_east - actual_west) / image.shape[1]
     deg_per_px_y = (actual_north - actual_south) / image.shape[0]
-
-    meters_per_deg = 111320 * np.cos(np.radians(np.mean(lats)))
-    resolution_m = scale_x  # Use actual GeoTIFF scale
 
     # 10. Rotate image to match AOI orientation
     if abs(rotation_angle) > 0.1:
