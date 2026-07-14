@@ -352,6 +352,61 @@ class TestGetGeoTiffExtent:
         finally:
             os.unlink(tmp_path)
 
+    def test_handles_negative_scale_y(self):
+        """Test GeoTIFF extent with negative scale_y (row 0 at bottom)."""
+        image = np.zeros((200, 100), dtype=np.uint8)
+        # Tiepoint at (0,0) pixel -> (900500, 275800) with NEGATIVE scale_y
+        # This means Y increases as row number increases (row 0 at bottom)
+        tiepoint = [0.0, 0.0, 0.0, 900500.0, 275800.0, 0.0]
+        scale = [1.0, -1.0, 0.0]  # Negative scale_y
+
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            tifffile.imwrite(
+                tmp_path,
+                image,
+                extratags=[
+                    (33922, 'd', 6, tiepoint, True),
+                    (33550, 'd', 3, scale, True),
+                ]
+            )
+
+            extent = get_geotiff_extent(tmp_path)
+            # With negative scale_y, Y goes from 275800 to 275800 - 200*(-1) = 276000
+            # Extent should be normalized: [left, right, bottom, top]
+            assert extent == pytest.approx([900500.0, 900600.0, 275800.0, 276000.0])
+        finally:
+            os.unlink(tmp_path)
+
+    def test_handles_negative_scale_x(self):
+        """Test GeoTIFF extent with negative scale_x (mirrored horizontally)."""
+        image = np.zeros((200, 100), dtype=np.uint8)
+        # Tiepoint with NEGATIVE scale_x (X decreases as column increases)
+        tiepoint = [0.0, 0.0, 0.0, 900600.0, 276000.0, 0.0]
+        scale = [-1.0, 1.0, 0.0]  # Negative scale_x
+
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            tifffile.imwrite(
+                tmp_path,
+                image,
+                extratags=[
+                    (33922, 'd', 6, tiepoint, True),
+                    (33550, 'd', 3, scale, True),
+                ]
+            )
+
+            extent = get_geotiff_extent(tmp_path)
+            # With negative scale_x, X goes from 900600 to 900600 + 100*(-1) = 900500
+            # Extent should be normalized: [left, right, bottom, top]
+            assert extent == pytest.approx([900500.0, 900600.0, 275800.0, 276000.0])
+        finally:
+            os.unlink(tmp_path)
+
 
 class TestThreadGetArgusImagery:
     """Tests for the threadGetArgusImagery function."""

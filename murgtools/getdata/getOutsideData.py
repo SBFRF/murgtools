@@ -486,6 +486,10 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
         x1, x2 = max(0, x1), min(w, x2)
         y1, y2 = max(0, y1), min(h, y2)
 
+        # Check for empty crop region (bbox outside scene)
+        if x2 <= x1 or y2 <= y1:
+            return None
+
         # Compute actual UTM bounds of cropped region
         actual_utm_west = utm_origin_x + x1 * scale_x
         actual_utm_east = utm_origin_x + x2 * scale_x
@@ -510,6 +514,10 @@ def getSatelliteImagery(corners, filename=None, collection='sentinel-2-l2a',
 
         x1, x2 = max(0, x1), min(w, x2)
         y1, y2 = max(0, y1), min(h, y2)
+
+        # Check for empty crop region (bbox outside scene)
+        if x2 <= x1 or y2 <= y1:
+            return None
 
         # Compute actual bounds from pixel indices
         actual_west = scene_bbox[0] + x1 / px_per_deg_x

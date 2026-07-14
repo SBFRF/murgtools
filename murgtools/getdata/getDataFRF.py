@@ -3381,12 +3381,16 @@ def get_geotiff_extent(filepath, to_latlon=False):
         scale = tags[33550].value     # (scaleX, scaleY, scaleZ)
         height, width = page.shape[:2]
         # Compute extent: [left, right, bottom, top]
-        left = tiepoint[3]
-        right = left + width * scale[0]
-        top_edge = tiepoint[4]
-        bottom_edge = top_edge - height * scale[1]
-        bottom = min(top_edge, bottom_edge)
-        top = max(top_edge, bottom_edge)
+        # Handle both positive and negative scale values by computing both
+        # edges and normalizing with min/max
+        x_edge1 = tiepoint[3]
+        x_edge2 = tiepoint[3] + width * scale[0]
+        y_edge1 = tiepoint[4]
+        y_edge2 = tiepoint[4] - height * scale[1]
+        left = min(x_edge1, x_edge2)
+        right = max(x_edge1, x_edge2)
+        bottom = min(y_edge1, y_edge2)
+        top = max(y_edge1, y_edge2)
 
         if not to_latlon:
             return [left, right, bottom, top]
