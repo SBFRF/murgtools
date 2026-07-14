@@ -127,20 +127,11 @@ def main():
             offset_mins = argus_result.get('time_offset_minutes', 0)
             if offset_mins != 0:
                 print(f"  Time offset from requested: {offset_mins} minutes ({offset_mins/60:.1f} hours)")
-            # Extract extent from the GeoTIFF (in State Plane coordinates)
-            sp_extent = get_geotiff_extent(tmp_path)
-            print(f"  State Plane extent: {sp_extent}")
+            native_extent = get_geotiff_extent(tmp_path)
+            print(f"  Native GeoTIFF extent: {native_extent}")
 
-            # Convert State Plane corners to lat/lon
-            # sp_extent is [left, right, bottom, top] in State Plane Easting/Northing
-            sp_left, sp_right, sp_bottom, sp_top = sp_extent
-
-            # Convert corners from State Plane to lat/lon
-            ll_corner = gp.FRFcoord(sp_left, sp_bottom, coordType='ncsp')  # SW corner
-            ur_corner = gp.FRFcoord(sp_right, sp_top, coordType='ncsp')    # NE corner
-
-            # Build lat/lon extent [left, right, bottom, top] as [lon_min, lon_max, lat_min, lat_max]
-            argus_extent = [ll_corner['Lon'], ur_corner['Lon'], ll_corner['Lat'], ur_corner['Lat']]
+            # Convert the Argus GeoTIFF bounds to lat/lon using the embedded CRS metadata.
+            argus_extent = get_geotiff_extent(tmp_path, to_latlon=True)
             print(f"  Lat/Lon extent: {argus_extent}")
     except Exception as e:
         print(f"  Error fetching Argus imagery: {e}")

@@ -1,12 +1,15 @@
 """Unit tests for getDataFRF module."""
 import datetime as DT
 import os
+import tempfile
 import numpy as np
+import tifffile
 import pytest
 import netCDF4 as nc
 from unittest.mock import MagicMock, patch, PropertyMock
+from pyproj import Transformer
 
-from murgtools.getdata.getDataFRF import gettime, removeDuplicatesFromDictionary
+from murgtools.getdata.getDataFRF import get_geotiff_extent, gettime, removeDuplicatesFromDictionary
 from murgtools.exceptions import InvalidGaugeError
 
 
@@ -277,6 +280,162 @@ class TestGetArgusImagery:
             result = getArgusImagery(DT.datetime(2024, 6, 15, 12, 0, 0), verbose=False)
 
             assert result is None
+
+
+class TestGetGeoTiffExtent:
+    """Tests for the get_geotiff_extent function."""
+
+    def test_returns_native_extent(self):
+        """Test native GeoTIFF extent extraction."""
+        image = np.zeros((20, 10), dtype=np.uint8)
+        tiepoint = [0.0, 0.0, 0.0, 900500.0, 276000.0, 0.0]
+        scale = [10.0, 10.0, 0.0]
+
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            tifffile.imwrite(
+                tmp_path,
+                image,
+                extratags=[
+                    (33922, 'd', 6, tiepoint, True),
+                    (33550, 'd', 3, scale, True),
+                ]
+            )
+
+            assert get_geotiff_extent(tmp_path) == pytest.approx([900500.0, 900600.0, 275800.0, 276000.0])
+        finally:
+            os.unlink(tmp_path)
+
+    def test_converts_projected_extent_to_latlon(self):
+        """Test projected GeoTIFF extent conversion to lon/lat."""
+        image = np.zeros((20, 10), dtype=np.uint8)
+        # GeoKey Directory: (version, revision, minor_rev, num_keys, key_id, location, count, value...)
+        geokey_dir = (1, 1, 0, 3, 1024, 0, 1, 1, 1025, 0, 1, 1, 3072, 0, 1, 32618)
+        tiepoint = [0.0, 0.0, 0.0, 500000.0, 4000000.0, 0.0]
+        scale = [10.0, 10.0, 0.0]
+
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            tifffile.imwrite(
+                tmp_path,
+                image,
+                extratags=[
+                    (33922, 'd', 6, tiepoint, True),
+                    (33550, 'd', 3, scale, True),
+                    (34735, 'H', len(geokey_dir), geokey_dir, True),
+                ]
+            )
+
+            extent = get_geotiff_extent(tmp_path, to_latlon=True)
+
+            transformer = Transformer.from_crs('EPSG:32618', 'EPSG:4326', always_xy=True)
+            corners = [
+                transformer.transform(500000.0, 3999800.0),
+                transformer.transform(500000.0, 4000000.0),
+                transformer.transform(500100.0, 3999800.0),
+                transformer.transform(500100.0, 4000000.0),
+            ]
+            lons = [lon for lon, _ in corners]
+            lats = [lat for _, lat in corners]
+            expected = [
+                min(lons),
+                max(lons),
+                min(lats),
+                max(lats),
+            ]
+
+            assert extent == pytest.approx(expected)
+        finally:
+            os.unlink(tmp_path)
+
+    def test_handles_negative_scale_y(self):
+        """Test GeoTIFF extent with negative scale_y (row 0 at bottom)."""
+        image = np.zeros((200, 100), dtype=np.uint8)
+        # Tiepoint at (0,0) pixel -> (900500, 275800) with NEGATIVE scale_y
+        # This means Y increases as row number increases (row 0 at bottom)
+        tiepoint = [0.0, 0.0, 0.0, 900500.0, 275800.0, 0.0]
+        scale = [1.0, -1.0, 0.0]  # Negative scale_y
+
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            tifffile.imwrite(
+                tmp_path,
+                image,
+                extratags=[
+                    (33922, 'd', 6, tiepoint, True),
+                    (33550, 'd', 3, scale, True),
+                ]
+            )
+
+            extent = get_geotiff_extent(tmp_path)
+            # With negative scale_y, Y goes from 275800 to 275800 - 200*(-1) = 276000
+            # Extent should be normalized: [left, right, bottom, top]
+            assert extent == pytest.approx([900500.0, 900600.0, 275800.0, 276000.0])
+        finally:
+            os.unlink(tmp_path)
+
+    def test_handles_negative_scale_x(self):
+        """Test GeoTIFF extent with negative scale_x (mirrored horizontally)."""
+        image = np.zeros((200, 100), dtype=np.uint8)
+        # Tiepoint with NEGATIVE scale_x (X decreases as column increases)
+        tiepoint = [0.0, 0.0, 0.0, 900600.0, 276000.0, 0.0]
+        scale = [-1.0, 1.0, 0.0]  # Negative scale_x
+
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            tifffile.imwrite(
+                tmp_path,
+                image,
+                extratags=[
+                    (33922, 'd', 6, tiepoint, True),
+                    (33550, 'd', 3, scale, True),
+                ]
+            )
+
+            extent = get_geotiff_extent(tmp_path)
+            # With negative scale_x, X goes from 900600 to 900600 + 100*(-1) = 900500
+            # Extent should be normalized: [left, right, bottom, top]
+            assert extent == pytest.approx([900500.0, 900600.0, 275800.0, 276000.0])
+        finally:
+            os.unlink(tmp_path)
+
+    def test_handles_nonzero_tiepoint_pixel(self):
+        """Test GeoTIFF extent when tiepoint references non-(0,0) pixel."""
+        image = np.zeros((200, 100), dtype=np.uint8)
+        # Tiepoint at pixel (10, 20) -> model coords (900510, 275980)
+        # With scale (1, 1), pixel (0,0) should be at:
+        #   origin_x = 900510 - 10 * 1 = 900500
+        #   origin_y = 275980 + 20 * 1 = 276000
+        # So extent should be [900500, 900600, 275800, 276000]
+        tiepoint = [10.0, 20.0, 0.0, 900510.0, 275980.0, 0.0]
+        scale = [1.0, 1.0, 0.0]
+
+        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            tifffile.imwrite(
+                tmp_path,
+                image,
+                extratags=[
+                    (33922, 'd', 6, tiepoint, True),
+                    (33550, 'd', 3, scale, True),
+                ]
+            )
+
+            extent = get_geotiff_extent(tmp_path)
+            # Verify extent is computed from pixel (0,0), not the tiepoint pixel
+            assert extent == pytest.approx([900500.0, 900600.0, 275800.0, 276000.0])
+        finally:
+            os.unlink(tmp_path)
 
 
 class TestThreadGetArgusImagery:
