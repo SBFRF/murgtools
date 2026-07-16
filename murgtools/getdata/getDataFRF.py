@@ -69,42 +69,49 @@ def open_dataset_with_fallback(primary_url, fallback_url, raise_on_failure=False
         return None
 
 
-def open_dataset_with_retry(url, max_retries=None, retry_delay=5):
+def open_dataset_with_retry(url, max_attempts=None, retry_delay=5):
     """Open a NetCDF dataset with retry logic for transient failures.
 
-    Attempts to open a NetCDF dataset, retrying on IOError up to max_retries
-    times with a delay between attempts. Logs progress using the logging module.
+    Attempts to open a NetCDF dataset up to max_attempts times, with a delay
+    between failed attempts. Logs progress using the logging module.
 
     Args:
         url (str): URL of the NetCDF file to open.
-        max_retries (int, optional): Maximum number of retry attempts.
-            Defaults to config.MAX_RETRY_ATTEMPTS.
-        retry_delay (int or float): Seconds to wait between retries. Default 5.
+        max_attempts (int, optional): Total number of attempts to make (not retries).
+            For example, max_attempts=3 means try up to 3 times total.
+            Defaults to config.MAX_RETRY_ATTEMPTS. Must be >= 1.
+        retry_delay (int or float): Seconds to wait between attempts. Default 5.
 
     Returns:
-        netCDF4.Dataset or None: The opened dataset, or None if all retries fail.
+        netCDF4.Dataset or None: The opened dataset, or None if all attempts fail.
+
+    Raises:
+        ValueError: If max_attempts is less than 1.
 
     Example:
         >>> ncfile = open_dataset_with_retry(
         ...     "http://server/data.nc",
-        ...     max_retries=3,
+        ...     max_attempts=3,  # Try up to 3 times
         ...     retry_delay=10
         ... )
     """
-    if max_retries is None:
-        max_retries = config.MAX_RETRY_ATTEMPTS
+    if max_attempts is None:
+        max_attempts = config.MAX_RETRY_ATTEMPTS
+
+    if max_attempts < 1:
+        raise ValueError(f"max_attempts must be >= 1, got {max_attempts}")
 
     last_error = None
-    for attempt in range(max_retries):
+    for attempt in range(max_attempts):
         try:
             return nc.Dataset(url)
         except (IOError, OSError) as e:
             last_error = e
-            if attempt < max_retries - 1:
-                logging.warning(f"Error reading {url}, attempt {attempt + 1}/{max_retries}. Retrying...")
+            if attempt < max_attempts - 1:
+                logging.warning(f"Error reading {url}, attempt {attempt + 1}/{max_attempts}. Retrying...")
                 time.sleep(retry_delay)
 
-    logging.error(f"Failed to open {url} after {max_retries} attempts: {last_error}")
+    logging.error(f"Failed to open {url} after {max_attempts} attempts: {last_error}")
     return None
 
 
@@ -3031,7 +3038,7 @@ class getDataTestBed:
         elif model == 'CMS':  # this is standard operational model url Structure
             fname = self.crunchDataLoc + u'waveModels/%s/%s/Field/Field.ncml' % (model, prefix)
 
-        ncfile = open_dataset_with_retry(fname, max_retries=15, retry_delay=10)
+        ncfile = open_dataset_with_retry(fname, max_attempts=15, retry_delay=10)
         if ncfile is None:
             raise RuntimeError('Data not accessible right now: {}'.format(fname))
 

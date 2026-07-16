@@ -87,7 +87,7 @@ class TestOpenDatasetWithRetry:
             mock_nc = MagicMock()
             mock_dataset.return_value = mock_nc
 
-            result = open_dataset_with_retry('http://server/data.nc', max_retries=3)
+            result = open_dataset_with_retry('http://server/data.nc', max_attempts=3)
 
             assert result == mock_nc
             mock_dataset.assert_called_once()
@@ -99,23 +99,23 @@ class TestOpenDatasetWithRetry:
                 mock_nc = MagicMock()
                 mock_dataset.side_effect = [IOError("Fail 1"), IOError("Fail 2"), mock_nc]
 
-                result = open_dataset_with_retry('http://server/data.nc', max_retries=3, retry_delay=0)
+                result = open_dataset_with_retry('http://server/data.nc', max_attempts=3, retry_delay=0)
 
                 assert result == mock_nc
                 assert mock_dataset.call_count == 3
 
-    def test_returns_none_after_max_retries(self):
-        """Test that None is returned after all retries exhausted."""
+    def test_returns_none_after_max_attempts(self):
+        """Test that None is returned after all attempts exhausted."""
         with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
             with patch('murgtools.getdata.getDataFRF.time.sleep'):
                 mock_dataset.side_effect = IOError("Always fails")
 
-                result = open_dataset_with_retry('http://server/data.nc', max_retries=3, retry_delay=0)
+                result = open_dataset_with_retry('http://server/data.nc', max_attempts=3, retry_delay=0)
 
                 assert result is None
                 assert mock_dataset.call_count == 3
 
-    def test_uses_config_default_for_max_retries(self):
+    def test_uses_config_default_for_max_attempts(self):
         """Test that config.MAX_RETRY_ATTEMPTS is used by default."""
         from murgtools import config
         with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
@@ -135,23 +135,29 @@ class TestOpenDatasetWithRetry:
                 mock_dataset.side_effect = [IOError("Fail"), mock_nc]
 
                 with caplog.at_level(logging.WARNING):
-                    open_dataset_with_retry('http://server/data.nc', max_retries=2, retry_delay=0)
+                    open_dataset_with_retry('http://server/data.nc', max_attempts=2, retry_delay=0)
 
                 assert "Error reading" in caplog.text
                 assert "http://server/data.nc" in caplog.text
 
     def test_logs_error_on_final_failure(self, caplog):
-        """Test that error is logged when all retries fail."""
+        """Test that error is logged when all attempts fail."""
         import logging
         with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
             with patch('murgtools.getdata.getDataFRF.time.sleep'):
                 mock_dataset.side_effect = IOError("Always fails")
 
                 with caplog.at_level(logging.ERROR):
-                    result = open_dataset_with_retry('http://server/data.nc', max_retries=2, retry_delay=0)
+                    result = open_dataset_with_retry('http://server/data.nc', max_attempts=2, retry_delay=0)
 
                 assert result is None
                 assert "Failed to open" in caplog.text
+
+    def test_raises_valueerror_for_invalid_max_attempts(self):
+        """Test that ValueError is raised when max_attempts < 1."""
+        import pytest
+        with pytest.raises(ValueError, match="max_attempts must be >= 1"):
+            open_dataset_with_retry('http://server/data.nc', max_attempts=0)
 
 
 class TestGettime:
