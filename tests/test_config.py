@@ -98,9 +98,144 @@ class TestGetThreddsServer:
     def test_socket_error_defaults_to_chl(self):
         """Verify socket errors default to CHL server."""
         with patch('socket.gethostbyname', side_effect=OSError('Network error')):
+            config.clear_server_cache()  # Clear cache to force re-detection
             url, prefix = config.get_thredds_server()
             assert url == config.THREDDS_CHL_PUBLIC
             assert prefix == 'frf'
+
+
+class TestServerCaching:
+    """Tests for server detection caching functionality."""
+
+    def setup_method(self):
+        """Clear the cache before each test."""
+        config.clear_server_cache()
+
+    def teardown_method(self):
+        """Clear the cache after each test."""
+        config.clear_server_cache()
+
+    def test_cache_returns_same_result(self):
+        """Verify cached result is returned on subsequent calls."""
+        # First call should compute and cache
+        result1 = config.get_thredds_server()
+        # Second call should return cached result
+        result2 = config.get_thredds_server()
+
+        assert result1 == result2
+
+    def test_cache_avoids_repeated_socket_calls(self):
+        """Verify socket operations are only called once with caching."""
+        with patch('murgtools.config.socket.gethostbyname', return_value='192.168.1.1') as mock_socket:
+            config.clear_server_cache()
+
+            # Multiple calls should only trigger one socket operation
+            config.get_thredds_server()
+            config.get_thredds_server()
+            config.get_thredds_server()
+
+            # Socket should only be called once (for IP detection)
+            assert mock_socket.call_count == 1
+
+    def test_clear_cache_resets_detection(self):
+        """Verify clear_server_cache resets the cached state."""
+        with patch('murgtools.config.socket.gethostbyname', return_value='192.168.1.1') as mock_socket:
+            config.clear_server_cache()
+
+            # First call
+            config.get_thredds_server()
+            assert mock_socket.call_count == 1
+
+            # Clear cache
+            config.clear_server_cache()
+
+            # Second call should trigger socket again
+            config.get_thredds_server()
+            assert mock_socket.call_count == 2
+
+    def test_explicit_ip_bypasses_cache(self):
+        """Verify explicit ip_address parameter still works correctly."""
+        config.clear_server_cache()
+
+        # Cache with external IP
+        with patch('murgtools.config.socket.gethostbyname', return_value='192.168.1.1'):
+            url1, prefix1 = config.get_thredds_server()
+            assert prefix1 == 'frf'  # External network
+
+        # Explicit FRF IP should return FRF server regardless of cache
+        url2, prefix2 = config.get_thredds_server(ip_address='134.164.129.1')
+        assert prefix2 == 'FRF'
+
+    def test_explicit_server_bypasses_cache(self):
+        """Verify explicit server parameter still works correctly."""
+        config.clear_server_cache()
+
+        # Cache with external IP
+        with patch('murgtools.config.socket.gethostbyname', return_value='192.168.1.1'):
+            url1, prefix1 = config.get_thredds_server()
+            assert prefix1 == 'frf'  # External network
+
+        # Explicit FRF server should return FRF regardless of cache
+        url2, prefix2 = config.get_thredds_server(server='FRF')
+        assert prefix2 == 'FRF'
+
+    def test_is_frf_network_uses_cached_ip(self):
+        """Verify is_frf_network uses cached IP address."""
+        with patch('murgtools.config.socket.gethostbyname', return_value='134.164.129.1') as mock_socket:
+            config.clear_server_cache()
+
+            # Multiple calls should only trigger one socket operation
+            config.is_frf_network()
+            config.is_frf_network()
+            config.is_frf_network()
+
+            assert mock_socket.call_count == 1
+
+    def test_thread_safety_concurrent_access(self):
+        """Verify cache is thread-safe under concurrent access."""
+        import threading
+        import time
+
+        config.clear_server_cache()
+        results = []
+        errors = []
+
+        def worker():
+            try:
+                for _ in range(10):
+                    result = config.get_thredds_server()
+                    results.append(result)
+            except Exception as e:
+                errors.append(e)
+
+        # Run multiple threads concurrently
+        threads = [threading.Thread(target=worker) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # No errors should occur
+        assert len(errors) == 0, f"Thread errors: {errors}"
+
+        # All results should be identical
+        assert len(set(results)) == 1, "Inconsistent results across threads"
+
+    def test_invalid_ip_address_type_handled(self):
+        """Verify non-string ip_address is handled safely."""
+        # Should not raise, should return CHL (external) server
+        url, prefix = config.get_thredds_server(ip_address=12345)
+        assert prefix == 'frf'
+
+        url, prefix = config.get_thredds_server(ip_address=None)
+        # None triggers cache lookup, which is valid
+        assert prefix in ('frf', 'FRF')
+
+    def test_is_frf_network_invalid_ip_returns_false(self):
+        """Verify is_frf_network returns False for invalid ip_address types."""
+        assert config.is_frf_network(ip_address=12345) is False
+        assert config.is_frf_network(ip_address=['134.164.1.1']) is False
+        assert config.is_frf_network(ip_address={'ip': '134.164.1.1'}) is False
 
 
 class TestIsFrfNetwork:
