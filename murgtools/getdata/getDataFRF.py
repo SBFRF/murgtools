@@ -1575,7 +1575,7 @@ class getObs:
                    6m AWAC          can be [4, 'awac-6m', 'AWAC-6m']
                    4.5m AWAC        can be [5, 'awac-4.5m', 'Awac-4.5m']
                    3.5m aquadopp    can be [6, 'adop-3.5m', 'aquadopp 3.5m']
-                   200m pressure    can be [8, 'xp200m', 'xp200']
+                   200m pressure    can be ['xp200m', 'xp200']
                    150m pressure    can be [9, 'xp150m', 'xp150']
                    125m pressure    can be [10, 'xp125m', 'xp125']
                    100m pressure    can be [11, 'xp100m']
@@ -3257,7 +3257,7 @@ class getDataTestBed:
                 6m AWAC       can be [4, 'awac-6m', 'AWAC-6m']
                 4.5m AWAC     can be [5, 'awac-4.5m', 'Awac-4.5m']
                 3.5m aquadopp can be [6, 'adop-3.5m', 'aquadopp 3.5m']
-                200m pressure can be [8, 'xp200m', 'xp200']
+                200m pressure can be ['xp200m', 'xp200']
                 150m pressure can be [9, 'xp150m', 'xp150']
                 125m pressure can be [10, 'xp125m', 'xp125']
 
