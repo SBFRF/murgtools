@@ -318,8 +318,10 @@ class getObs:
         data_source = f"getObs.{data_type}"
         time_range = (self.epochd1, self.epochd2)
 
-        # Include server in extra_params for cache key
-        cache_params = {'server': self.server}
+        # Include resolved server URL in extra_params for cache key
+        # Use FRFdataloc (the actual server being used) rather than self.server
+        # (which may be None for auto-detect)
+        cache_params = {'server_url': self.FRFdataloc}
         if extra_params:
             cache_params.update(extra_params)
 

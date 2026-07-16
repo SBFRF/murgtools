@@ -2,7 +2,6 @@
 
 import json
 import os
-import pickle
 import tempfile
 import threading
 import time

@@ -179,14 +179,14 @@ class DataCache:
             env_dir = os.environ.get(config.ENV_CACHE_DIR)
             self._cache_dir = Path(env_dir) if env_dir else Path(config.DEFAULT_CACHE_DIR)
 
-        # Determine TTL
+        # Determine TTL (use setter for validation)
         if ttl_days is not None:
-            self._ttl_days = ttl_days
+            self.ttl_days = ttl_days  # Use setter for validation
         else:
             env_ttl = os.environ.get(config.ENV_CACHE_TTL_DAYS)
             if env_ttl:
                 try:
-                    self._ttl_days = int(env_ttl)
+                    self.ttl_days = int(env_ttl)  # Use setter for validation
                 except ValueError:
                     logger.warning(f"Invalid TTL value '{env_ttl}', using default")
                     self._ttl_days = config.DEFAULT_CACHE_TTL_DAYS
