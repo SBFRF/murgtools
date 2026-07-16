@@ -25,6 +25,104 @@ from murgtools.utils import geoprocess as gp, sblib as sb
 from murgtools import config
 from murgtools.exceptions import InvalidGaugeError
 
+# =============================================================================
+# Helper Functions for Network Fallback Patterns
+# =============================================================================
+
+
+def open_dataset_with_fallback(primary_url, fallback_url, raise_on_failure=False):
+    """Open a NetCDF dataset with automatic fallback to secondary URL.
+
+    Attempts to open a NetCDF dataset from the primary URL. If that fails
+    with an IOError or OSError (network issue, file not found), automatically
+    tries the fallback URL.
+
+    Args:
+        primary_url (str): Primary URL to attempt first (e.g., FRF local server).
+        fallback_url (str): Fallback URL if primary fails (e.g., CHL public server).
+        raise_on_failure (bool): If True, raises IOError when both URLs fail.
+            If False (default), returns None on failure.
+
+    Returns:
+        netCDF4.Dataset or None: The opened dataset, or None if both URLs fail
+            and raise_on_failure is False.
+
+    Raises:
+        IOError: If both URLs fail and raise_on_failure=True.
+
+    Example:
+        >>> ncfile = open_dataset_with_fallback(
+        ...     self.FRFdataloc + self.dataloc,
+        ...     self.chlDataLoc + self.dataloc,
+        ...     raise_on_failure=True
+        ... )
+    """
+    primary_error = None
+    try:
+        return nc.Dataset(primary_url)
+    except (IOError, OSError) as e:
+        primary_error = e  # Save for diagnostic message
+
+    try:
+        return nc.Dataset(fallback_url)
+    except (IOError, OSError) as fallback_error:
+        if raise_on_failure:
+            raise IOError(
+                f"Failed to open dataset from both URLs.\n"
+                f"  Primary ({primary_url}): {primary_error}\n"
+                f"  Fallback ({fallback_url}): {fallback_error}"
+            ) from fallback_error
+        return None
+
+
+def open_dataset_with_retry(url, max_attempts=None, retry_delay=5):
+    """Open a NetCDF dataset with retry logic for transient failures.
+
+    Attempts to open a NetCDF dataset up to max_attempts times, with a delay
+    between failed attempts. Logs progress using the logging module.
+
+    Args:
+        url (str): URL of the NetCDF file to open.
+        max_attempts (int, optional): Total number of attempts to make (not retries).
+            For example, max_attempts=3 means try up to 3 times total.
+            Defaults to config.MAX_RETRY_ATTEMPTS. Must be >= 1.
+        retry_delay (int or float): Seconds to wait between attempts. Default 5.
+
+    Returns:
+        netCDF4.Dataset or None: The opened dataset, or None if all attempts fail.
+
+    Raises:
+        ValueError: If max_attempts is less than 1.
+
+    Example:
+        >>> ncfile = open_dataset_with_retry(
+        ...     "http://server/data.nc",
+        ...     max_attempts=3,  # Try up to 3 times
+        ...     retry_delay=10
+        ... )
+    """
+    if max_attempts is None:
+        max_attempts = config.MAX_RETRY_ATTEMPTS
+
+    if max_attempts < 1:
+        raise ValueError(f"max_attempts must be >= 1, got {max_attempts}")
+
+    last_error = None
+    for attempt in range(max_attempts):
+        try:
+            return nc.Dataset(url)
+        except (IOError, OSError) as e:
+            last_error = e
+            if attempt < max_attempts - 1:
+                logging.warning(
+                    f"Error reading {url}, attempt {attempt + 1}/{max_attempts}: {e}. Retrying..."
+                )
+                time.sleep(retry_delay)
+
+    logging.error(f"Failed to open {url} after {max_attempts} attempts: {last_error}")
+    return None
+
+
 def gettime(allEpoch, epochStart, epochEnd, indexRef=0):
     """This function opens the netcdf file, and retrieves time.
 
@@ -1518,10 +1616,11 @@ class getObs:
             see help on self.waveGaugeURLlookup for gauge keys
         """
         self._waveGaugeURLlookup(gaugenumber)
-        try:
-            ncfile = nc.Dataset(self.FRFdataloc + self.dataloc)
-        except IOError:
-            ncfile = nc.Dataset(self.chlDataLoc + self.dataloc)
+        ncfile = open_dataset_with_fallback(
+            self.FRFdataloc + self.dataloc,
+            self.chlDataLoc + self.dataloc,
+            raise_on_failure=True
+        )
         out = {'Lat': ncfile['latitude'][:],
                'Lon': ncfile['longitude'][:]}
         return out
@@ -2946,18 +3045,10 @@ class getDataTestBed:
                 model, prefix, grid, grid)
         elif model == 'CMS':  # this is standard operational model url Structure
             fname = self.crunchDataLoc + u'waveModels/%s/%s/Field/Field.ncml' % (model, prefix)
-        finished = False
-        n = 0
-        while not finished and n < 15:
-            try:
-                ncfile = nc.Dataset(fname)
-                finished = True
-            except IOError:
-                print('Error reading {}, trying again'.format(fname))
-                time.sleep(10)
-                n += 1
-        if not finished:
-            raise (RuntimeError, 'Data not accessible right now')
+
+        ncfile = open_dataset_with_retry(fname, max_attempts=15, retry_delay=10)
+        if ncfile is None:
+            raise RuntimeError('Data not accessible right now: {}'.format(fname))
 
         assert var in ncfile.variables.keys(), 'variable called is not in file please use\n%s' % \
                                                ncfile.variables.keys()
