@@ -1556,3 +1556,134 @@ class TestGetArgusPixelIntensity:
 
             assert result is not None
             np.testing.assert_array_equal(result['intensity'][0], [255, 128, 64])
+
+
+class TestLookupTableDictionaries:
+    """Tests for the O(1) dictionary lookup tables that replace if-elif chains."""
+
+    def test_wave_gauge_lookup_dict_imports(self):
+        """Test that lookup dictionaries are importable."""
+        from murgtools.getdata.getDataFRF import _WAVE_GAUGE_URLS, _WL_GAUGE_CONFIG
+        assert isinstance(_WAVE_GAUGE_URLS, dict)
+        assert isinstance(_WL_GAUGE_CONFIG, dict)
+        assert len(_WAVE_GAUGE_URLS) > 50  # Should have many entries
+        assert len(_WL_GAUGE_CONFIG) > 20  # Should have many entries
+
+    def test_wave_gauge_urls_lowercase_keys(self):
+        """Test that all keys in wave gauge dict are lowercase strings."""
+        from murgtools.getdata.getDataFRF import _WAVE_GAUGE_URLS
+        for key in _WAVE_GAUGE_URLS:
+            assert isinstance(key, str), f"Key {key} should be a string"
+            assert key == key.lower(), f"Key {key} should be lowercase"
+
+    def test_wl_gauge_config_structure(self):
+        """Test that WL gauge config has correct tuple structure."""
+        from murgtools.getdata.getDataFRF import _WL_GAUGE_CONFIG
+        for key, value in _WL_GAUGE_CONFIG.items():
+            assert isinstance(value, tuple), f"Value for {key} should be a tuple"
+            assert len(value) == 2, f"Value for {key} should have 2 elements (gname, url)"
+            gname, url = value
+            assert isinstance(gname, str), f"gname for {key} should be a string"
+            assert isinstance(url, str), f"url for {key} should be a string"
+
+    def test_wave_gauge_lookup_all_aliases(self):
+        """Test that various gauge aliases resolve correctly via dictionary lookup."""
+        from murgtools.getdata.getDataFRF import getObs
+        import datetime as DT
+
+        # Create instance to test lookup
+        obs = getObs(DT.datetime(2024, 1, 1), DT.datetime(2024, 1, 2))
+
+        # Test various aliases for 26m waverider
+        for alias in ['0', 'waverider-26m', '26m']:
+            obs._waveGaugeURLlookup(alias)
+            assert 'waverider-26m' in obs.dataloc
+
+        # Test case insensitivity
+        obs._waveGaugeURLlookup('AWAC-11M')
+        assert 'awac-11m' in obs.dataloc
+
+        obs._waveGaugeURLlookup('WaveRider-26m')
+        assert 'waverider-26m' in obs.dataloc
+
+    def test_wl_gauge_lookup_integer_keys(self):
+        """Test that WL gauge lookup works with integer keys."""
+        from murgtools.getdata.getDataFRF import getObs
+        import datetime as DT
+
+        obs = getObs(DT.datetime(2024, 1, 1), DT.datetime(2024, 1, 2))
+
+        # Test integer keys
+        obs._wlGageURLlookup(2)
+        assert 'awac-11m' in obs.dataloc
+        assert obs.gname == 'AWAC 11m'
+
+        obs._wlGageURLlookup(3)
+        assert 'awac-8m' in obs.dataloc
+        assert obs.gname == 'AWAC 8m'
+
+    def test_wl_gauge_lookup_string_keys(self):
+        """Test that WL gauge lookup works with string keys."""
+        from murgtools.getdata.getDataFRF import getObs
+        import datetime as DT
+
+        obs = getObs(DT.datetime(2024, 1, 1), DT.datetime(2024, 1, 2))
+
+        # Test string keys
+        obs._wlGageURLlookup('awac-8m')
+        assert 'awac-8m' in obs.dataloc
+        assert obs.gname == 'AWAC 8m'
+
+        obs._wlGageURLlookup('xp200m')
+        assert 'xp200m' in obs.dataloc
+        assert obs.gname == 'Paros xp200m'
+
+    def test_invalid_wave_gauge_raises_error(self):
+        """Test that invalid wave gauge raises InvalidGaugeError."""
+        from murgtools.getdata.getDataFRF import getObs
+        from murgtools.exceptions import InvalidGaugeError
+        import datetime as DT
+
+        obs = getObs(DT.datetime(2024, 1, 1), DT.datetime(2024, 1, 2))
+
+        with pytest.raises(InvalidGaugeError):
+            obs._waveGaugeURLlookup('nonexistent_gauge')
+
+    def test_invalid_wl_gauge_raises_error(self):
+        """Test that invalid WL gauge raises InvalidGaugeError."""
+        from murgtools.getdata.getDataFRF import getObs
+        from murgtools.exceptions import InvalidGaugeError
+        import datetime as DT
+
+        obs = getObs(DT.datetime(2024, 1, 1), DT.datetime(2024, 1, 2))
+
+        with pytest.raises(InvalidGaugeError):
+            obs._wlGageURLlookup('nonexistent_gauge')
+
+    def test_lidar_gauge_aliases(self):
+        """Test that lidar wave gauge aliases resolve correctly."""
+        from murgtools.getdata.getDataFRF import _WAVE_GAUGE_URLS
+
+        # Test all expected lidar gauge aliases exist
+        lidar_aliases = [
+            'lidarwavegauge140', 'lidargauge140', 'lidarwavegauge140m', 'lidargauge140m',
+            'lidarwavegauge110', 'lidargauge110', 'lidarwavegauge110m', 'lidargauge110m',
+            'lidarwavegauge100', 'lidargauge100', 'lidarwavegauge100m', 'lidargauge100m',
+            'lidarwavegauge90', 'lidargauge90', 'lidarwavegauge90m', 'lidargauge90m',
+            'lidarwavegauge80', 'lidargauge80', 'lidarwavegauge80m', 'lidargauge80m',
+        ]
+        for alias in lidar_aliases:
+            assert alias in _WAVE_GAUGE_URLS, f"Missing lidar alias: {alias}"
+
+    def test_signature_sensor_aliases(self):
+        """Test that signature sensor aliases resolve correctly."""
+        from murgtools.getdata.getDataFRF import _WAVE_GAUGE_URLS
+
+        sig_aliases = [
+            'sig940-300', '940-300',
+            'sig769-300', '769-300',
+            'sig940-400', '940-400',
+            'sig940-600', '940-600',
+        ]
+        for alias in sig_aliases:
+            assert alias in _WAVE_GAUGE_URLS, f"Missing signature alias: {alias}"
