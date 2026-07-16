@@ -131,12 +131,7 @@ def _get_cached_ip():
     """
     global _cached_ip_address
 
-    # Fast path: check without lock first (safe because we only write once)
-    if _cached_ip_address is not None:
-        return _cached_ip_address
-
     with _cache_lock:
-        # Double-check after acquiring lock
         if _cached_ip_address is not None:
             return _cached_ip_address
 
@@ -146,7 +141,7 @@ def _get_cached_ip():
             # Covers socket.error, socket.gaierror, socket.herror in Python 3
             _cached_ip_address = ''
 
-    return _cached_ip_address
+        return _cached_ip_address
 
 
 def get_thredds_server(server=None, ip_address=None):
