@@ -1687,3 +1687,83 @@ class TestLookupTableDictionaries:
         ]
         for alias in sig_aliases:
             assert alias in _WAVE_GAUGE_URLS, f"Missing signature alias: {alias}"
+
+    def test_gauge_8_maps_to_xp250m(self):
+        """Test that gauge '8' maps to xp250m (first match in original if-elif chain)."""
+        from murgtools.getdata.getDataFRF import getObs, _WAVE_GAUGE_URLS
+        import datetime as DT
+
+        # Verify dictionary has correct mapping
+        assert _WAVE_GAUGE_URLS['8'] == 'oceanography/waves/xp250m/xp250m.ncml'
+
+        # Verify lookup method returns xp250m for '8'
+        obs = getObs(DT.datetime(2024, 1, 1), DT.datetime(2024, 1, 2))
+        obs._waveGaugeURLlookup('8')
+        assert 'xp250m' in obs.dataloc
+        assert 'xp200m' not in obs.dataloc
+
+        # Verify xp200m still accessible via explicit keys
+        obs._waveGaugeURLlookup('xp200m')
+        assert 'xp200m' in obs.dataloc
+
+    def test_none_input_raises_error(self):
+        """Test that None input raises InvalidGaugeError with clear message."""
+        from murgtools.getdata.getDataFRF import getObs
+        from murgtools.exceptions import InvalidGaugeError
+        import datetime as DT
+
+        obs = getObs(DT.datetime(2024, 1, 1), DT.datetime(2024, 1, 2))
+
+        with pytest.raises(InvalidGaugeError) as exc_info:
+            obs._waveGaugeURLlookup(None)
+        assert 'None' in str(exc_info.value)
+
+        with pytest.raises(InvalidGaugeError) as exc_info:
+            obs._wlGageURLlookup(None)
+        assert 'None' in str(exc_info.value)
+
+    def test_empty_string_raises_error(self):
+        """Test that empty string raises InvalidGaugeError."""
+        from murgtools.getdata.getDataFRF import getObs
+        from murgtools.exceptions import InvalidGaugeError
+        import datetime as DT
+
+        obs = getObs(DT.datetime(2024, 1, 1), DT.datetime(2024, 1, 2))
+
+        with pytest.raises(InvalidGaugeError):
+            obs._waveGaugeURLlookup('')
+
+    def test_numeric_gauge_inputs(self):
+        """Test that numeric inputs (int, float) are handled correctly."""
+        from murgtools.getdata.getDataFRF import getObs
+        from murgtools.exceptions import InvalidGaugeError
+        import datetime as DT
+
+        obs = getObs(DT.datetime(2024, 1, 1), DT.datetime(2024, 1, 2))
+
+        # Integer input should work (str(0) = '0')
+        obs._waveGaugeURLlookup(0)
+        assert 'waverider-26m' in obs.dataloc
+
+        # Float input str(0.0) = '0.0' which is NOT in dict, should raise error
+        with pytest.raises(InvalidGaugeError):
+            obs._waveGaugeURLlookup(0.0)
+
+    def test_case_insensitivity_edge_cases(self):
+        """Test case insensitivity with mixed case inputs."""
+        from murgtools.getdata.getDataFRF import getObs
+        import datetime as DT
+
+        obs = getObs(DT.datetime(2024, 1, 1), DT.datetime(2024, 1, 2))
+
+        # Test various case combinations
+        test_cases = [
+            ('WAVERIDER-26M', 'waverider-26m'),
+            ('WaveRider-26m', 'waverider-26m'),
+            ('AWAC-11M', 'awac-11m'),
+            ('Awac-11m', 'awac-11m'),
+            ('XP200M', 'xp200m'),
+        ]
+        for input_val, expected_substr in test_cases:
+            obs._waveGaugeURLlookup(input_val)
+            assert expected_substr in obs.dataloc, f"Failed for input {input_val}"

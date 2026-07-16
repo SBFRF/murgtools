@@ -162,11 +162,12 @@ _WAVE_GAUGE_URLS = {
     # xp340m pressure
     'xp340m': 'oceanography/waves/xp340m/xp340m.ncml',
     'xp340': 'oceanography/waves/xp340m/xp340m.ncml',
-    # xp250m pressure (note: '8' maps here, not xp200m - preserved from original)
+    # xp250m pressure - NOTE: '8' appears in both xp250m and xp200m in original code,
+    # but if-elif means first match wins, so '8' -> xp250m
+    '8': 'oceanography/waves/xp250m/xp250m.ncml',
     'xp250m': 'oceanography/waves/xp250m/xp250m.ncml',
     'xp250': 'oceanography/waves/xp250m/xp250m.ncml',
-    # xp200m pressure
-    '8': 'oceanography/waves/xp200m/xp200m.ncml',
+    # xp200m pressure (use explicit 'xp200m' or 'xp200' keys, not '8')
     'xp200m': 'oceanography/waves/xp200m/xp200m.ncml',
     'xp200': 'oceanography/waves/xp200m/xp200m.ncml',
     # xp150m pressure
@@ -1528,8 +1529,8 @@ class getObs:
                 4.5m AWAC        can be [5, 'awac-4.5m', 'Awac-4.5m']
                 3.5m aquadopp    can be [6, 'adop-3.5m', 'aquadopp 3.5m']
                 340m pressure    can be ['xp340m', 'xp340']
-                250m pressure    can be ['xp250m', 'xp250']
-                200m pressure    can be [8, 'xp200m', 'xp200']
+                250m pressure    can be [8, 'xp250m', 'xp250']
+                200m pressure    can be ['xp200m', 'xp200']
                 150m pressure    can be [9, 'xp150m', 'xp150']
                 125m pressure    can be [10, 'xp125m', 'xp125']
                 100m pressure    can be [11, 'xp100m']
@@ -1542,7 +1543,14 @@ class getObs:
         Returns:
           Nothing, this just sets the self.dataloc data member
 
+        Raises:
+            InvalidGaugeError: If gaugenumber is None or not a valid gauge identifier.
+
         """
+        # Input validation
+        if gaugenumber is None:
+            raise InvalidGaugeError(gaugenumber, message='Gauge number cannot be None.')
+
         # Normalize to lowercase string for case-insensitive lookup
         key = str(gaugenumber).lower()
 
@@ -1560,7 +1568,7 @@ class getObs:
         Uses O(1) dictionary lookup via module-level _WL_GAUGE_CONFIG table.
 
         Args:
-            gaugenumber: a string or number that refers to a specific gauge and will set a url
+            gaugenumber: a string or integer that refers to a specific gauge and will set a url
                Available values include:
                    11m AWAC         can be [2, 'AWAC-11m', 'awac-11m', 'Awac-11m']
                    8m AWAC          can be [3, 'awac-8m', 'AWAC-8m']
@@ -1576,7 +1584,14 @@ class getObs:
         Returns:
              Nothing, this just sets the self.dataloc and self.gname data members
 
+        Raises:
+            InvalidGaugeError: If gaugenumber is None or not a valid gauge identifier.
+
         """
+        # Input validation
+        if gaugenumber is None:
+            raise InvalidGaugeError(gaugenumber, message='Gauge number cannot be None.')
+
         # O(1) dictionary lookup (supports both int and string keys)
         config_tuple = _WL_GAUGE_CONFIG.get(gaugenumber)
         if config_tuple is not None:
