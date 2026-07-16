@@ -111,3 +111,7 @@ Thumbs.db
 *.nc
 *.pickle
 *.pkl
+
+# Local development configs
+.claude/
+.mcp-debug-tools/

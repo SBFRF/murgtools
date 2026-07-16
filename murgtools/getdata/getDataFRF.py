@@ -23,6 +23,7 @@ import tifffile
 
 from murgtools.utils import geoprocess as gp, sblib as sb
 from murgtools import config
+from murgtools.cache import DataCache
 from murgtools.exceptions import InvalidGaugeError
 
 # =============================================================================
@@ -314,8 +315,27 @@ def removeDuplicatesFromDictionary(inputDict):
 
 class getObs:
     """Class focused on retrieving observational data."""
-    def __init__(self, d1, d2, **kwargs):
-        """Data are returned in self.dataindex are inclusive at start, exclusive at end."""
+    def __init__(self, d1, d2, use_cache=False, cache_dir=None, cache_ttl_days=None, **kwargs):
+        """Initialize observation data retriever.
+
+        Data are returned in self.dataindex are inclusive at start, exclusive at end.
+
+        Args:
+            d1 (datetime): Start date for data retrieval.
+            d2 (datetime): End date for data retrieval.
+            use_cache (bool): Enable disk caching of retrieved data. Default False.
+                When enabled, data is cached to disk and reused on subsequent calls
+                with the same parameters. Cache expires after cache_ttl_days.
+            cache_dir (str, optional): Directory for cache files.
+                Default: /data/getdata (or MURGTOOLS_CACHE_DIR env var).
+            cache_ttl_days (int, optional): Cache time-to-live in days.
+                Default: 180 days / 6 months (or MURGTOOLS_CACHE_TTL_DAYS env var).
+
+        Keyword Args:
+            server (str): Force server selection ('FRF' or 'CHL').
+            force_refresh (bool): If True, bypass cache and fetch fresh data.
+                Only applies when use_cache=True.
+        """
         # this is active wave gauge list for looping through as needed
         self.waveGaugeList = ['waverider-26m', 'waverider-17m', 'waverider-17m-1d', 'waverider-20m-1d', 'awac-11m',
                               'awac-jpier-11m', '8m-array', 'awac-6m', 'awac-4.5m', 'adop-3.5m',
@@ -341,6 +361,14 @@ class getObs:
         self.chlDataLoc = config.THREDDS_CHL_ALT
         self.server = kwargs.get('server', None)
         self._comp_time()
+
+        # Cache configuration
+        self._use_cache = use_cache
+        self._force_refresh = kwargs.get('force_refresh', False)
+        if use_cache:
+            self._cache = DataCache(enabled=True, cache_dir=cache_dir, ttl_days=cache_ttl_days)
+        else:
+            self._cache = None
         # assert type(self.d2) == DT.datetime, 'd1 need to be in python "Datetime" data types'
         # assert type(self.d1) == DT.datetime, 'd2 need to be in python "Datetime" data types'
 
@@ -368,7 +396,42 @@ class getObs:
         rounding = (seconds + roundto / 2) // roundto * roundto
         return dt + DT.timedelta(0, rounding - seconds, -dt.microsecond)
 
-    def getWaveData(self, gaugenumber=0, roundto=30, removeBadDataFlag=4, **kwargs):
+    def _get_with_cache(self, data_type, fetch_func, extra_params=None, force_refresh=False):
+        """Retrieve data with optional caching.
+
+        Args:
+            data_type (str): Type of data being retrieved (e.g., 'wave', 'wind', 'bathy').
+            fetch_func (callable): Function that fetches the data from the server.
+            extra_params (dict, optional): Additional parameters that affect the data
+                (e.g., gauge number, variable names). Used in cache key generation.
+            force_refresh (bool): If True, bypass cache and fetch fresh data.
+
+        Returns:
+            The requested data dictionary.
+        """
+        if not self._use_cache or self._cache is None:
+            return fetch_func()
+
+        # Build cache key components
+        data_source = f"getObs.{data_type}"
+        time_range = (self.epochd1, self.epochd2)
+
+        # Include resolved server URL in extra_params for cache key
+        # Use FRFdataloc (the actual server being used) rather than self.server
+        # (which may be None for auto-detect)
+        cache_params = {'server_url': self.FRFdataloc}
+        if extra_params:
+            cache_params.update(extra_params)
+
+        return self._cache.get(
+            data_source=data_source,
+            fetch_func=fetch_func,
+            time_range=time_range,
+            extra_params=cache_params,
+            force_refresh=force_refresh or self._force_refresh,
+        )
+
+    def getWaveData(self, gaugenumber=0, roundto=30, removeBadDataFlag=4, force_refresh=False, **kwargs):
         """This function pulls down the data from the thredds server and puts the data into a dictionary.
 
         TODO: Set optional date input from function arguments to change self.start self.end
@@ -381,6 +444,8 @@ class getObs:
           removeBadDataFlag (int): this will remove data with a directional flag of 3/4 signaling questionable or
              failed directional spectra (default = 4, remove failed (directional) spectral data time periods)
              valid values: [3, 4, False]  False will not remove any data
+          force_refresh (bool): If True and caching is enabled, bypass cache and fetch fresh data.
+             Default False.
 
         Keyword Args:
             "returnAB" (bool): if this is True function will return a's and b's for time period (default=False)
@@ -415,6 +480,23 @@ class getObs:
         """
         returnAB = kwargs.get('returnAB', False)
         spec = kwargs.get('spec', False)
+
+        # Use caching if enabled
+        cache_params = {
+            'gaugenumber': gaugenumber,
+            'roundto': roundto,
+            'removeBadDataFlag': removeBadDataFlag,
+            'returnAB': returnAB,
+            'spec': spec,
+        }
+
+        def fetch_data():
+            return self._getWaveData_impl(gaugenumber, roundto, removeBadDataFlag, returnAB, spec)
+
+        return self._get_with_cache('wave', fetch_data, cache_params, force_refresh)
+
+    def _getWaveData_impl(self, gaugenumber, roundto, removeBadDataFlag, returnAB, spec):
+        """Internal implementation of getWaveData (without caching)."""
         # Making gauges flexible
         self._waveGaugeURLlookup(gaugenumber)
         # parsing out data of interest in time
@@ -581,7 +663,7 @@ class getObs:
         # else:
         return self.getWaveData(gaugenumber, roundto, removeBadDataFlag, returnAB=returnAB, spec=True)
 
-    def getCurrents(self, gaugenumber=5, roundto=1):
+    def getCurrents(self, gaugenumber=5, roundto=1, force_refresh=False):
         """This function pulls down the currents data from the Thredds Server.
 
         Args:
@@ -604,6 +686,8 @@ class getObs:
           roundto: the time over which the wind record exists, ie data is collected in 10 minute
           increments
             data is rounded to the nearst [roundto] (default 1 min)
+
+          force_refresh (bool): If True and caching is enabled, bypass cache and fetch fresh data.
 
         Returns:
             dict, None if error is encoutered
@@ -635,6 +719,15 @@ class getObs:
                 'meanP' (array): mean pressure
 
         """
+        cache_params = {'gaugenumber': gaugenumber, 'roundto': roundto}
+
+        def fetch_data():
+            return self._getCurrents_impl(gaugenumber, roundto)
+
+        return self._get_with_cache('currents', fetch_data, cache_params, force_refresh)
+
+    def _getCurrents_impl(self, gaugenumber, roundto):
+        """Internal implementation of getCurrents (without caching)."""
         valid_gauges = [2, 3, 4, 5, 6, 'awac-11m', 'awac-8m', 'awac-6m', 'awac-4.5m', 'awac-5m',
                         'adop-3.5m', 'awac-jpier-11m', 'awac-jpier', 'jpier-11m',
                         'sig769-300', '769-300',
@@ -718,7 +811,7 @@ class getObs:
             self.curpacket = None
             return self.curpacket
 
-    def getWind(self, gaugenumber=0, collectionlength=10):
+    def getWind(self, gaugenumber=0, collectionlength=10, force_refresh=False):
         """This function retrieves the wind data.
 
         Collection length is the time over which the wind record exists ie data is collected in 10 minute increments
@@ -735,6 +828,8 @@ class getObs:
             '832 wind gauge' in [2]
 
             '732 wind gauge' in [3]
+
+          force_refresh (bool): If True and caching is enabled, bypass cache and fetch fresh data.
 
         Returns:
             dict, will return None if an error is encountered
@@ -771,6 +866,15 @@ class getObs:
                 'gaugeht' (float): gauge height for uncorrected wind measurements
 
         """
+        cache_params = {'gaugenumber': gaugenumber, 'collectionlength': collectionlength}
+
+        def fetch_data():
+            return self._getWind_impl(gaugenumber, collectionlength)
+
+        return self._get_with_cache('wind', fetch_data, cache_params, force_refresh)
+
+    def _getWind_impl(self, gaugenumber, collectionlength):
+        """Internal implementation of getWind (without caching)."""
         # Making gauges flexible
         # different Gauges
         if gaugenumber in ['derived', 'Derived', 0]:
@@ -860,7 +964,7 @@ class getObs:
             print('     ---- ERROR: Problem finding wind !!!')
             return None
 
-    def getWL(self, collectionlength=6):
+    def getWL(self, collectionlength=6, force_refresh=False):
         """This function retrieves the water level data from the server.
 
         WL data on server is NAVD88
@@ -871,6 +975,7 @@ class getObs:
 
         Args:
           collectionlength (int): dictates what value to round time to (Default value = 6)
+          force_refresh (bool): If True and caching is enabled, bypass cache and fetch fresh data.
 
         Returns:
           dictionary with keys
@@ -891,6 +996,15 @@ class getObs:
             'predictedWL': predicted tide
 
         """
+        cache_params = {'collectionlength': collectionlength}
+
+        def fetch_data():
+            return self._getWL_impl(collectionlength)
+
+        return self._get_with_cache('waterlevel', fetch_data, cache_params, force_refresh)
+
+    def _getWL_impl(self, collectionlength):
+        """Internal implementation of getWL (without caching)."""
         # this is the back end of the url for waterlevel
         self.dataloc = 'oceanography/waterlevel/eopNoaaTide/eopNoaaTide.ncml'
 
@@ -922,7 +1036,7 @@ class getObs:
             self.WLpacket = None
         return self.WLpacket
 
-    def getGaugeWL(self, gaugenumber=5, roundto=1):
+    def getGaugeWL(self, gaugenumber=5, roundto=1, force_refresh=False):
         """This function pulls down the water level data at a particular gauge from the Server.
 
         Args:
@@ -930,6 +1044,7 @@ class getObs:
             roundto: the time over which the wind record exists ie data is collected in 10 minute
             increments
                         data is rounded to the nearst [roundto] (default 1 min)
+            force_refresh (bool): If True and caching is enabled, bypass cache and fetch fresh data.
 
         Returns
             wlpacket (dict) with keys below
@@ -950,6 +1065,15 @@ class getObs:
                 'yFRF': yFRF position of the gage
 
         """
+        cache_params = {'gaugenumber': gaugenumber, 'roundto': roundto}
+
+        def fetch_data():
+            return self._getGaugeWL_impl(gaugenumber, roundto)
+
+        return self._get_with_cache('gaugewl', fetch_data, cache_params, force_refresh)
+
+    def _getGaugeWL_impl(self, gaugenumber, roundto):
+        """Internal implementation of getGaugeWL (without caching)."""
         # Making gauges flexible
         self._wlGageURLlookup(gaugenumber)
         # parsing out data of interest in time
@@ -1003,7 +1127,7 @@ class getObs:
                             'name': str(self.ncfile.title), }
             return wlpacket
 
-    def getBathyTransectFromNC(self, profilenumbers=None, method=1, forceReturnAll=False):
+    def getBathyTransectFromNC(self, profilenumbers=None, method=1, forceReturnAll=False, force_refresh=False):
         """This function gets the bathymetric data from the server.
 
         Args:
@@ -1015,6 +1139,8 @@ class getObs:
           forceReturnAll (bool): (Default Value = False)
                 This will force the survey to take and return all indices between start and end,
                 not the single
+          force_refresh (bool): If True and caching is enabled, bypass cache and fetch fresh data.
+
         Returns:
           dictionary with keys, will return None if call fails
             'xFRF': x coordinate in frf
@@ -1040,6 +1166,15 @@ class getObs:
             'Ellipsoid': which ellipsoid is used
 
         """
+        cache_params = {'profilenumbers': profilenumbers, 'method': method, 'forceReturnAll': forceReturnAll}
+
+        def fetch_data():
+            return self._getBathyTransectFromNC_impl(profilenumbers, method, forceReturnAll)
+
+        return self._get_with_cache('bathytransect', fetch_data, cache_params, force_refresh)
+
+    def _getBathyTransectFromNC_impl(self, profilenumbers, method, forceReturnAll):
+        """Internal implementation of getBathyTransectFromNC (without caching)."""
         # do check here on profile numbers
         # acceptableProfileNumbers = [None, ]
         self.dataloc = 'geomorphology/elevationTransects/survey/surveyTransects.ncml'  # location
@@ -1753,13 +1888,14 @@ class getObs:
 
         return sensor_locations
 
-    def getLidarRunup(self, removeMasked=True):
+    def getLidarRunup(self, removeMasked=True, force_refresh=False):
         """This function will get the wave runup measurements from the lidar mounted in the dune.
 
         Args:
           removeMasked: if data come back as masked, remove from the arrays removeMasked will
             toggle the removing of data points from the tsTime series based on the flag
             status (Default value = True)
+          force_refresh (bool): If True and caching is enabled, bypass cache and fetch fresh data.
 
         Returns:
           dictionary with collected data.  keys listed below (for more info see the netCDF file
@@ -1792,6 +1928,15 @@ class getObs:
             measurement
 
         """
+        cache_params = {'removeMasked': removeMasked}
+
+        def fetch_data():
+            return self._getLidarRunup_impl(removeMasked)
+
+        return self._get_with_cache('lidarrunup', fetch_data, cache_params, force_refresh)
+
+    def _getLidarRunup_impl(self, removeMasked):
+        """Internal implementation of getLidarRunup (without caching)."""
         self.dataloc = 'oceanography/waves/lidarWaveRunup/lidarWaveRunup.ncml'
         self.ncfile, self.allEpoch, _ = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                                dtRound=1 * 60)
@@ -1852,14 +1997,15 @@ class getObs:
             out = None
         return out
 
-    def getCTD(self):
+    def getCTD(self, force_refresh=False):
         """THIS FUNCTION IS CURRENTLY BROKEN.
 
         THE PROBLEM IS THAT self.cshore_ncfile does not have any keys?
         TODO fix this function
         This function gets the CTD data from the thredds server
 
-        Args:  None
+        Args:
+            force_refresh (bool): If True and caching is enabled, bypass cache and fetch fresh data.
 
         Returns:
             dict: output dictionary with keys listed below, will return None if error happens
@@ -1880,6 +2026,15 @@ class getObs:
                 'sigmaT':
 
         """
+        cache_params = {}
+
+        def fetch_data():
+            return self._getCTD_impl()
+
+        return self._get_with_cache('ctd', fetch_data, cache_params, force_refresh)
+
+    def _getCTD_impl(self):
+        """Internal implementation of getCTD (without caching)."""
         # do check here on profile numbers
         # acceptableProfileNumbers = [None, ]
         self.dataloc = 'oceanography/ctd/eop-ctd/eop-ctd.ncml'  # location of the gridded surveys
@@ -1925,7 +2080,7 @@ class getObs:
 
         return ctd_Dict
 
-    def getALT(self, gaugeName=None, removeMasked=True):
+    def getALT(self, gaugeName=None, removeMasked=True, force_refresh=False):
         """This function gets the Altimeter data from the thredds server.
 
         Args:
@@ -1935,6 +2090,8 @@ class getObs:
              'Alt769-350', 'Alt861-150', 'Alt861-200', 'Alt861-250', 'Alt861-300', 'Alt861-350'
 
           removeMasked (bool): remove the data that are masked (Default value = True)
+
+          force_refresh (bool): If True and caching is enabled, bypass cache and fetch fresh data.
 
         Returns:
           a dictionary with below keys with selected data, for more info see netCDF files on server
@@ -1963,6 +2120,15 @@ class getObs:
             'bottomElev': Kalman filtered elevation
 
         """
+        cache_params = {'gaugeName': gaugeName, 'removeMasked': removeMasked}
+
+        def fetch_data():
+            return self._getALT_impl(gaugeName, removeMasked)
+
+        return self._get_with_cache('altimeter', fetch_data, cache_params, force_refresh)
+
+    def _getALT_impl(self, gaugeName, removeMasked):
+        """Internal implementation of getALT (without caching)."""
         # location of the data
         gauge_list = ['Alt769-150', 'Alt769-200', 'Alt769-250', 'Alt769-300', 'Alt769-350',
                       'Alt861-150', 'Alt861-200', 'Alt861-250', 'Alt861-300', 'Alt861-350',
