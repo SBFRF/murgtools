@@ -34,8 +34,8 @@ def open_dataset_with_fallback(primary_url, fallback_url, raise_on_failure=False
     """Open a NetCDF dataset with automatic fallback to secondary URL.
 
     Attempts to open a NetCDF dataset from the primary URL. If that fails
-    with an IOError (network issue, file not found), automatically tries
-    the fallback URL.
+    with an IOError or OSError (network issue, file not found), automatically
+    tries the fallback URL.
 
     Args:
         primary_url (str): Primary URL to attempt first (e.g., FRF local server).
@@ -44,7 +44,8 @@ def open_dataset_with_fallback(primary_url, fallback_url, raise_on_failure=False
             If False (default), returns None on failure.
 
     Returns:
-        netCDF4.Dataset: The opened dataset.
+        netCDF4.Dataset or None: The opened dataset, or None if both URLs fail
+            and raise_on_failure is False.
 
     Raises:
         IOError: If both URLs fail and raise_on_failure=True.
