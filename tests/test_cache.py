@@ -496,3 +496,112 @@ class TestCacheWithComplexData:
 
         assert result1 == 'data1'
         assert result2 == 'data2'
+
+
+class TestGetObsCacheIntegration:
+    """Tests for getObs class caching integration."""
+
+    def setup_method(self):
+        """Create temporary cache directory."""
+        self.temp_dir = tempfile.mkdtemp()
+        cache._global_cache = None
+
+    def teardown_method(self):
+        """Clean up."""
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+        cache._global_cache = None
+
+    def test_getobs_cache_disabled_by_default(self):
+        """Test that getObs has caching disabled by default."""
+        import datetime as DT
+        from murgtools.getdata.getDataFRF import getObs
+
+        d1 = DT.datetime(2024, 1, 1)
+        d2 = DT.datetime(2024, 1, 2)
+
+        obs = getObs(d1, d2)
+        assert obs._use_cache is False
+        assert obs._cache is None
+
+    def test_getobs_cache_can_be_enabled(self):
+        """Test that getObs caching can be enabled."""
+        import datetime as DT
+        from murgtools.getdata.getDataFRF import getObs
+
+        d1 = DT.datetime(2024, 1, 1)
+        d2 = DT.datetime(2024, 1, 2)
+
+        obs = getObs(d1, d2, use_cache=True, cache_dir=self.temp_dir)
+        assert obs._use_cache is True
+        assert obs._cache is not None
+        assert obs._cache.enabled is True
+
+    def test_getobs_cache_custom_ttl(self):
+        """Test that getObs accepts custom TTL."""
+        import datetime as DT
+        from murgtools.getdata.getDataFRF import getObs
+
+        d1 = DT.datetime(2024, 1, 1)
+        d2 = DT.datetime(2024, 1, 2)
+
+        obs = getObs(d1, d2, use_cache=True, cache_dir=self.temp_dir, cache_ttl_days=90)
+        assert obs._cache.ttl_days == 90
+
+    def test_getobs_get_with_cache_helper(self):
+        """Test the _get_with_cache helper method."""
+        import datetime as DT
+        from murgtools.getdata.getDataFRF import getObs
+
+        d1 = DT.datetime(2024, 1, 1)
+        d2 = DT.datetime(2024, 1, 2)
+
+        # Test with caching disabled
+        obs_no_cache = getObs(d1, d2)
+        call_count = 0
+
+        def fetch():
+            nonlocal call_count
+            call_count += 1
+            return {'data': call_count}
+
+        # Without cache, should call fetch each time
+        result1 = obs_no_cache._get_with_cache('test', fetch)
+        result2 = obs_no_cache._get_with_cache('test', fetch)
+        assert call_count == 2
+
+        # Test with caching enabled
+        call_count = 0
+        obs_with_cache = getObs(d1, d2, use_cache=True, cache_dir=self.temp_dir)
+
+        result3 = obs_with_cache._get_with_cache('test', fetch)
+        result4 = obs_with_cache._get_with_cache('test', fetch)
+        assert call_count == 1  # Only called once due to caching
+        assert result3 == result4
+
+    def test_getobs_force_refresh(self):
+        """Test force_refresh parameter."""
+        import datetime as DT
+        from murgtools.getdata.getDataFRF import getObs
+
+        d1 = DT.datetime(2024, 1, 1)
+        d2 = DT.datetime(2024, 1, 2)
+
+        obs = getObs(d1, d2, use_cache=True, cache_dir=self.temp_dir)
+        call_count = 0
+
+        def fetch():
+            nonlocal call_count
+            call_count += 1
+            return {'data': call_count}
+
+        # First call caches
+        result1 = obs._get_with_cache('test', fetch)
+        # Second call returns cached
+        result2 = obs._get_with_cache('test', fetch)
+        assert call_count == 1
+
+        # Force refresh should call again
+        result3 = obs._get_with_cache('test', fetch, force_refresh=True)
+        assert call_count == 2
+        assert result3['data'] == 2

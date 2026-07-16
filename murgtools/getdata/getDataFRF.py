@@ -23,6 +23,7 @@ import tifffile
 
 from murgtools.utils import geoprocess as gp, sblib as sb
 from murgtools import config
+from murgtools.cache import DataCache, get_cache
 from murgtools.exceptions import InvalidGaugeError
 
 def gettime(allEpoch, epochStart, epochEnd, indexRef=0):
@@ -216,8 +217,27 @@ def removeDuplicatesFromDictionary(inputDict):
 
 class getObs:
     """Class focused on retrieving observational data."""
-    def __init__(self, d1, d2, **kwargs):
-        """Data are returned in self.dataindex are inclusive at start, exclusive at end."""
+    def __init__(self, d1, d2, use_cache=False, cache_dir=None, cache_ttl_days=None, **kwargs):
+        """Initialize observation data retriever.
+
+        Data are returned in self.dataindex are inclusive at start, exclusive at end.
+
+        Args:
+            d1 (datetime): Start date for data retrieval.
+            d2 (datetime): End date for data retrieval.
+            use_cache (bool): Enable disk caching of retrieved data. Default False.
+                When enabled, data is cached to disk and reused on subsequent calls
+                with the same parameters. Cache expires after cache_ttl_days.
+            cache_dir (str, optional): Directory for cache files.
+                Default: /data/getdata (or MURGTOOLS_CACHE_DIR env var).
+            cache_ttl_days (int, optional): Cache time-to-live in days.
+                Default: 180 days / 6 months (or MURGTOOLS_CACHE_TTL_DAYS env var).
+
+        Keyword Args:
+            server (str): Force server selection ('FRF' or 'CHL').
+            force_refresh (bool): If True, bypass cache and fetch fresh data.
+                Only applies when use_cache=True.
+        """
         # this is active wave gauge list for looping through as needed
         self.waveGaugeList = ['waverider-26m', 'waverider-17m', 'waverider-17m-1d', 'waverider-20m-1d', 'awac-11m',
                               'awac-jpier-11m', '8m-array', 'awac-6m', 'awac-4.5m', 'adop-3.5m',
@@ -243,6 +263,14 @@ class getObs:
         self.chlDataLoc = config.THREDDS_CHL_ALT
         self.server = kwargs.get('server', None)
         self._comp_time()
+
+        # Cache configuration
+        self._use_cache = use_cache
+        self._force_refresh = kwargs.get('force_refresh', False)
+        if use_cache:
+            self._cache = DataCache(enabled=True, cache_dir=cache_dir, ttl_days=cache_ttl_days)
+        else:
+            self._cache = None
         # assert type(self.d2) == DT.datetime, 'd1 need to be in python "Datetime" data types'
         # assert type(self.d1) == DT.datetime, 'd2 need to be in python "Datetime" data types'
 
@@ -270,7 +298,40 @@ class getObs:
         rounding = (seconds + roundto / 2) // roundto * roundto
         return dt + DT.timedelta(0, rounding - seconds, -dt.microsecond)
 
-    def getWaveData(self, gaugenumber=0, roundto=30, removeBadDataFlag=4, **kwargs):
+    def _get_with_cache(self, data_type, fetch_func, extra_params=None, force_refresh=False):
+        """Retrieve data with optional caching.
+
+        Args:
+            data_type (str): Type of data being retrieved (e.g., 'wave', 'wind', 'bathy').
+            fetch_func (callable): Function that fetches the data from the server.
+            extra_params (dict, optional): Additional parameters that affect the data
+                (e.g., gauge number, variable names). Used in cache key generation.
+            force_refresh (bool): If True, bypass cache and fetch fresh data.
+
+        Returns:
+            The requested data dictionary.
+        """
+        if not self._use_cache or self._cache is None:
+            return fetch_func()
+
+        # Build cache key components
+        data_source = f"getObs.{data_type}"
+        time_range = (self.epochd1, self.epochd2)
+
+        # Include server in extra_params for cache key
+        cache_params = {'server': self.server}
+        if extra_params:
+            cache_params.update(extra_params)
+
+        return self._cache.get(
+            data_source=data_source,
+            fetch_func=fetch_func,
+            time_range=time_range,
+            extra_params=cache_params,
+            force_refresh=force_refresh or self._force_refresh,
+        )
+
+    def getWaveData(self, gaugenumber=0, roundto=30, removeBadDataFlag=4, force_refresh=False, **kwargs):
         """This function pulls down the data from the thredds server and puts the data into a dictionary.
 
         TODO: Set optional date input from function arguments to change self.start self.end
@@ -283,6 +344,8 @@ class getObs:
           removeBadDataFlag (int): this will remove data with a directional flag of 3/4 signaling questionable or
              failed directional spectra (default = 4, remove failed (directional) spectral data time periods)
              valid values: [3, 4, False]  False will not remove any data
+          force_refresh (bool): If True and caching is enabled, bypass cache and fetch fresh data.
+             Default False.
 
         Keyword Args:
             "returnAB" (bool): if this is True function will return a's and b's for time period (default=False)
@@ -317,6 +380,23 @@ class getObs:
         """
         returnAB = kwargs.get('returnAB', False)
         spec = kwargs.get('spec', False)
+
+        # Use caching if enabled
+        cache_params = {
+            'gaugenumber': gaugenumber,
+            'roundto': roundto,
+            'removeBadDataFlag': removeBadDataFlag,
+            'returnAB': returnAB,
+            'spec': spec,
+        }
+
+        def fetch_data():
+            return self._getWaveData_impl(gaugenumber, roundto, removeBadDataFlag, returnAB, spec)
+
+        return self._get_with_cache('wave', fetch_data, cache_params, force_refresh)
+
+    def _getWaveData_impl(self, gaugenumber, roundto, removeBadDataFlag, returnAB, spec):
+        """Internal implementation of getWaveData (without caching)."""
         # Making gauges flexible
         self._waveGaugeURLlookup(gaugenumber)
         # parsing out data of interest in time

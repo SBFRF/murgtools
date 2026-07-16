@@ -46,7 +46,22 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
+import numpy as np
+
 from . import config
+
+
+class NumpyJSONEncoder(json.JSONEncoder):
+    """JSON encoder that handles numpy types."""
+
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
 
 logger = logging.getLogger(__name__)
 
@@ -356,7 +371,7 @@ class DataCache:
 
             # Write metadata first (smaller, validates we can write)
             with open(meta_path, 'w') as f:
-                json.dump(metadata.to_dict(), f, indent=2)
+                json.dump(metadata.to_dict(), f, indent=2, cls=NumpyJSONEncoder)
 
             # Write data
             with open(data_path, 'wb') as f:
