@@ -57,16 +57,21 @@ def open_dataset_with_fallback(primary_url, fallback_url, raise_on_failure=False
         ...     raise_on_failure=True
         ... )
     """
+    primary_error = None
     try:
         return nc.Dataset(primary_url)
-    except (IOError, OSError):
-        pass  # Fall through to try fallback
+    except (IOError, OSError) as e:
+        primary_error = e  # Save for diagnostic message
 
     try:
         return nc.Dataset(fallback_url)
-    except (IOError, OSError) as e:
+    except (IOError, OSError) as fallback_error:
         if raise_on_failure:
-            raise IOError(f"Failed to open dataset from both {primary_url} and {fallback_url}") from e
+            raise IOError(
+                f"Failed to open dataset from both URLs.\n"
+                f"  Primary ({primary_url}): {primary_error}\n"
+                f"  Fallback ({fallback_url}): {fallback_error}"
+            ) from fallback_error
         return None
 
 
@@ -109,7 +114,9 @@ def open_dataset_with_retry(url, max_attempts=None, retry_delay=5):
         except (IOError, OSError) as e:
             last_error = e
             if attempt < max_attempts - 1:
-                logging.warning(f"Error reading {url}, attempt {attempt + 1}/{max_attempts}. Retrying...")
+                logging.warning(
+                    f"Error reading {url}, attempt {attempt + 1}/{max_attempts}: {e}. Retrying..."
+                )
                 time.sleep(retry_delay)
 
     logging.error(f"Failed to open {url} after {max_attempts} attempts: {last_error}")
