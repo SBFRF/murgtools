@@ -1549,7 +1549,7 @@ class getObs:
         """
         # Input validation
         if gaugenumber is None:
-            raise InvalidGaugeError(gaugenumber, message='Gauge number cannot be None.')
+            raise InvalidGaugeError(None, message="Invalid gauge: 'None'. Gauge number cannot be None.")
 
         # Normalize to lowercase string for case-insensitive lookup
         key = str(gaugenumber).lower()
@@ -1590,7 +1590,7 @@ class getObs:
         """
         # Input validation
         if gaugenumber is None:
-            raise InvalidGaugeError(gaugenumber, message='Gauge number cannot be None.')
+            raise InvalidGaugeError(None, message="Invalid gauge: 'None'. Gauge number cannot be None.")
 
         # O(1) dictionary lookup (supports both int and string keys)
         config_tuple = _WL_GAUGE_CONFIG.get(gaugenumber)

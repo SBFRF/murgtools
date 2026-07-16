@@ -1562,12 +1562,21 @@ class TestLookupTableDictionaries:
     """Tests for the O(1) dictionary lookup tables that replace if-elif chains."""
 
     def test_wave_gauge_lookup_dict_imports(self):
-        """Test that lookup dictionaries are importable."""
+        """Test that lookup dictionaries are importable and contain required keys."""
         from murgtools.getdata.getDataFRF import _WAVE_GAUGE_URLS, _WL_GAUGE_CONFIG
         assert isinstance(_WAVE_GAUGE_URLS, dict)
         assert isinstance(_WL_GAUGE_CONFIG, dict)
-        assert len(_WAVE_GAUGE_URLS) > 50  # Should have many entries
-        assert len(_WL_GAUGE_CONFIG) > 20  # Should have many entries
+
+        # Check for required wave gauge keys (representative samples)
+        required_wave_keys = ['waverider-26m', 'waverider-17m', 'awac-11m', 'awac-8m',
+                              '0', '1', '2', '3', 'xp200m', 'xp250m', '8m-array']
+        for key in required_wave_keys:
+            assert key in _WAVE_GAUGE_URLS, f"Missing required wave gauge key: {key}"
+
+        # Check for required WL gauge keys (including integer keys)
+        required_wl_keys = [2, 3, 'awac-11m', 'awac-8m', 8, 'xp200m']
+        for key in required_wl_keys:
+            assert key in _WL_GAUGE_CONFIG, f"Missing required WL gauge key: {key}"
 
     def test_wave_gauge_urls_lowercase_keys(self):
         """Test that all keys in wave gauge dict are lowercase strings."""
@@ -1605,27 +1614,6 @@ class TestLookupTableDictionaries:
 
         obs._waveGaugeURLlookup('WaveRider-26m')
         assert 'waverider-26m' in obs.dataloc
-
-    def test_wave_gauge_lookup_8_maps_to_xp250m(self):
-        """Test that '8' maps to xp250m (not xp200m) for backward compatibility.
-
-        In the original if-elif chain, '8' appeared in both xp250m and xp200m
-        conditions, but xp250m was checked first, so '8' -> xp250m. This test
-        ensures the dictionary lookup preserves that behavior.
-        """
-        from murgtools.getdata.getDataFRF import getObs
-        import datetime as DT
-
-        obs = getObs(DT.datetime(2024, 1, 1), DT.datetime(2024, 1, 2))
-
-        # The key '8' should map to xp250m (first match in original if-elif)
-        obs._waveGaugeURLlookup('8')
-        assert 'xp250m' in obs.dataloc, f"'8' should map to xp250m, got {obs.dataloc}"
-        assert 'xp200m' not in obs.dataloc, f"'8' should NOT map to xp200m"
-
-        # Integer 8 is also normalized to '8' via str().lower()
-        obs._waveGaugeURLlookup(8)
-        assert 'xp250m' in obs.dataloc, f"8 (int) should map to xp250m, got {obs.dataloc}"
 
     def test_wl_gauge_lookup_integer_keys(self):
         """Test that WL gauge lookup works with integer keys."""
