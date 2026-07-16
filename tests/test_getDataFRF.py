@@ -9,8 +9,134 @@ import netCDF4 as nc
 from unittest.mock import MagicMock, patch, PropertyMock
 from pyproj import Transformer
 
-from murgtools.getdata.getDataFRF import get_geotiff_extent, gettime, removeDuplicatesFromDictionary
+from murgtools.getdata.getDataFRF import (
+    get_geotiff_extent, gettime, removeDuplicatesFromDictionary,
+    open_dataset_with_fallback, open_dataset_with_retry
+)
 from murgtools.exceptions import InvalidGaugeError
+
+
+class TestOpenDatasetWithFallback:
+    """Tests for the open_dataset_with_fallback helper function."""
+
+    def test_returns_dataset_from_primary_url(self):
+        """Test that primary URL is tried first and returned on success."""
+        with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
+            mock_nc = MagicMock()
+            mock_dataset.return_value = mock_nc
+
+            result = open_dataset_with_fallback('http://primary/data.nc', 'http://fallback/data.nc')
+
+            assert result == mock_nc
+            mock_dataset.assert_called_once_with('http://primary/data.nc')
+
+    def test_falls_back_to_secondary_url_on_ioerror(self):
+        """Test that fallback URL is used when primary fails."""
+        with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
+            mock_nc = MagicMock()
+            mock_dataset.side_effect = [IOError("Primary failed"), mock_nc]
+
+            result = open_dataset_with_fallback('http://primary/data.nc', 'http://fallback/data.nc')
+
+            assert result == mock_nc
+            assert mock_dataset.call_count == 2
+            mock_dataset.assert_any_call('http://primary/data.nc')
+            mock_dataset.assert_any_call('http://fallback/data.nc')
+
+    def test_returns_none_when_both_fail(self):
+        """Test that None is returned when both URLs fail."""
+        with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
+            mock_dataset.side_effect = IOError("Failed")
+
+            result = open_dataset_with_fallback('http://primary/data.nc', 'http://fallback/data.nc')
+
+            assert result is None
+
+    def test_prints_error_message_when_both_fail(self, capsys):
+        """Test that error message is printed when both URLs fail."""
+        with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
+            mock_dataset.side_effect = IOError("Failed")
+
+            open_dataset_with_fallback(
+                'http://primary/data.nc',
+                'http://fallback/data.nc',
+                error_message="Custom error message"
+            )
+
+            captured = capsys.readouterr()
+            assert "Custom error message" in captured.out
+
+    def test_handles_oserror_as_well_as_ioerror(self):
+        """Test that OSError is also caught (Python 3 compatibility)."""
+        with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
+            mock_nc = MagicMock()
+            mock_dataset.side_effect = [OSError("Primary failed"), mock_nc]
+
+            result = open_dataset_with_fallback('http://primary/data.nc', 'http://fallback/data.nc')
+
+            assert result == mock_nc
+
+
+class TestOpenDatasetWithRetry:
+    """Tests for the open_dataset_with_retry helper function."""
+
+    def test_returns_dataset_on_first_try(self):
+        """Test that dataset is returned immediately on success."""
+        with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
+            mock_nc = MagicMock()
+            mock_dataset.return_value = mock_nc
+
+            result = open_dataset_with_retry('http://server/data.nc', max_retries=3)
+
+            assert result == mock_nc
+            mock_dataset.assert_called_once()
+
+    def test_retries_on_ioerror(self):
+        """Test that function retries on IOError."""
+        with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
+            with patch('murgtools.getdata.getDataFRF.time.sleep'):
+                mock_nc = MagicMock()
+                mock_dataset.side_effect = [IOError("Fail 1"), IOError("Fail 2"), mock_nc]
+
+                result = open_dataset_with_retry('http://server/data.nc', max_retries=3, retry_delay=0)
+
+                assert result == mock_nc
+                assert mock_dataset.call_count == 3
+
+    def test_returns_none_after_max_retries(self):
+        """Test that None is returned after all retries exhausted."""
+        with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
+            with patch('murgtools.getdata.getDataFRF.time.sleep'):
+                mock_dataset.side_effect = IOError("Always fails")
+
+                result = open_dataset_with_retry('http://server/data.nc', max_retries=3, retry_delay=0)
+
+                assert result is None
+                assert mock_dataset.call_count == 3
+
+    def test_uses_config_default_for_max_retries(self):
+        """Test that config.MAX_RETRY_ATTEMPTS is used by default."""
+        from murgtools import config
+        with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
+            with patch('murgtools.getdata.getDataFRF.time.sleep'):
+                mock_dataset.side_effect = IOError("Always fails")
+
+                open_dataset_with_retry('http://server/data.nc', retry_delay=0)
+
+                assert mock_dataset.call_count == config.MAX_RETRY_ATTEMPTS
+
+    def test_prints_error_message_on_retry(self, capsys):
+        """Test that error message is printed on each retry."""
+        with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
+            with patch('murgtools.getdata.getDataFRF.time.sleep'):
+                mock_nc = MagicMock()
+                mock_dataset.side_effect = [IOError("Fail"), mock_nc]
+
+                open_dataset_with_retry('http://server/data.nc', max_retries=2, retry_delay=0)
+
+                captured = capsys.readouterr()
+                assert "Error reading" in captured.out
+                assert "http://server/data.nc" in captured.out
 
 
 class TestGettime:

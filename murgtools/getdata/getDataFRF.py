@@ -25,6 +25,83 @@ from murgtools.utils import geoprocess as gp, sblib as sb
 from murgtools import config
 from murgtools.exceptions import InvalidGaugeError
 
+# =============================================================================
+# Helper Functions for Network Fallback Patterns
+# =============================================================================
+
+
+def open_dataset_with_fallback(primary_url, fallback_url, error_message=None):
+    """Open a NetCDF dataset with automatic fallback to secondary URL.
+
+    Attempts to open a NetCDF dataset from the primary URL. If that fails
+    with an IOError (network issue, file not found), automatically tries
+    the fallback URL.
+
+    Args:
+        primary_url (str): Primary URL to attempt first (e.g., FRF local server).
+        fallback_url (str): Fallback URL if primary fails (e.g., CHL public server).
+        error_message (str, optional): Custom error message to print if both fail.
+            If None, no message is printed on failure.
+
+    Returns:
+        netCDF4.Dataset or None: The opened dataset, or None if both URLs fail.
+
+    Example:
+        >>> ncfile = open_dataset_with_fallback(
+        ...     self.FRFdataloc + self.dataloc,
+        ...     self.chlDataLoc + self.dataloc
+        ... )
+    """
+    try:
+        return nc.Dataset(primary_url)
+    except (IOError, OSError):
+        try:
+            return nc.Dataset(fallback_url)
+        except (IOError, OSError):
+            if error_message:
+                print(error_message)
+            return None
+
+
+def open_dataset_with_retry(url, max_retries=None, retry_delay=5, error_message=None):
+    """Open a NetCDF dataset with retry logic for transient failures.
+
+    Attempts to open a NetCDF dataset, retrying on IOError up to max_retries
+    times with a delay between attempts.
+
+    Args:
+        url (str): URL of the NetCDF file to open.
+        max_retries (int, optional): Maximum number of retry attempts.
+            Defaults to config.MAX_RETRY_ATTEMPTS.
+        retry_delay (int or float): Seconds to wait between retries. Default 5.
+        error_message (str, optional): Custom error message format string.
+            Can include {url}, {attempt}, {max_retries} placeholders.
+
+    Returns:
+        netCDF4.Dataset or None: The opened dataset, or None if all retries fail.
+
+    Example:
+        >>> ncfile = open_dataset_with_retry(
+        ...     "http://server/data.nc",
+        ...     max_retries=3,
+        ...     retry_delay=10
+        ... )
+    """
+    if max_retries is None:
+        max_retries = config.MAX_RETRY_ATTEMPTS
+
+    for attempt in range(max_retries):
+        try:
+            return nc.Dataset(url)
+        except (IOError, OSError):
+            if attempt < max_retries - 1:
+                msg = error_message or 'Error reading {url}, trying again {attempt}/{max_retries}'
+                print(msg.format(url=url, attempt=attempt + 1, max_retries=max_retries))
+                time.sleep(retry_delay)
+
+    return None
+
+
 def gettime(allEpoch, epochStart, epochEnd, indexRef=0):
     """This function opens the netcdf file, and retrieves time.
 
@@ -1518,10 +1595,12 @@ class getObs:
             see help on self.waveGaugeURLlookup for gauge keys
         """
         self._waveGaugeURLlookup(gaugenumber)
-        try:
-            ncfile = nc.Dataset(self.FRFdataloc + self.dataloc)
-        except IOError:
-            ncfile = nc.Dataset(self.chlDataLoc + self.dataloc)
+        ncfile = open_dataset_with_fallback(
+            self.FRFdataloc + self.dataloc,
+            self.chlDataLoc + self.dataloc
+        )
+        if ncfile is None:
+            raise IOError(f"Could not open dataset for gauge {gaugenumber}")
         out = {'Lat': ncfile['latitude'][:],
                'Lon': ncfile['longitude'][:]}
         return out
@@ -2946,18 +3025,10 @@ class getDataTestBed:
                 model, prefix, grid, grid)
         elif model == 'CMS':  # this is standard operational model url Structure
             fname = self.crunchDataLoc + u'waveModels/%s/%s/Field/Field.ncml' % (model, prefix)
-        finished = False
-        n = 0
-        while not finished and n < 15:
-            try:
-                ncfile = nc.Dataset(fname)
-                finished = True
-            except IOError:
-                print('Error reading {}, trying again'.format(fname))
-                time.sleep(10)
-                n += 1
-        if not finished:
-            raise (RuntimeError, 'Data not accessible right now')
+
+        ncfile = open_dataset_with_retry(fname, max_retries=15, retry_delay=10)
+        if ncfile is None:
+            raise RuntimeError('Data not accessible right now: {}'.format(fname))
 
         assert var in ncfile.variables.keys(), 'variable called is not in file please use\n%s' % \
                                                ncfile.variables.keys()
