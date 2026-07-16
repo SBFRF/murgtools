@@ -52,7 +52,11 @@ from . import config
 
 
 class NumpyJSONEncoder(json.JSONEncoder):
-    """JSON encoder that handles numpy types."""
+    """JSON encoder that handles numpy types and other non-JSON-serializable objects.
+
+    Falls back to string representation for unknown types to ensure cache
+    operations don't fail unexpectedly.
+    """
 
     def default(self, obj):
         if isinstance(obj, np.integer):
@@ -61,7 +65,17 @@ class NumpyJSONEncoder(json.JSONEncoder):
             return float(obj)
         if isinstance(obj, np.ndarray):
             return obj.tolist()
-        return super().default(obj)
+        # Handle datetime objects
+        if hasattr(obj, 'isoformat'):
+            return obj.isoformat()
+        # Handle Path objects
+        if hasattr(obj, '__fspath__'):
+            return str(obj)
+        # Fallback to string for unknown types (graceful degradation)
+        try:
+            return super().default(obj)
+        except TypeError:
+            return str(obj)
 
 logger = logging.getLogger(__name__)
 
@@ -251,9 +265,9 @@ class DataCache:
             key_parts.append(f"t{time_range[0]}-{time_range[1]}")
 
         if extra_params:
-            # Sort keys for deterministic ordering
+            # Sort keys for deterministic ordering, use custom encoder for numpy types
             sorted_params = sorted(extra_params.items())
-            key_parts.append(json.dumps(sorted_params, sort_keys=True))
+            key_parts.append(json.dumps(sorted_params, sort_keys=True, cls=NumpyJSONEncoder))
 
         key_string = '|'.join(str(p) for p in key_parts)
         return hashlib.sha256(key_string.encode()).hexdigest()[:32]
@@ -292,21 +306,22 @@ class DataCache:
 
         cache_key = self._generate_cache_key(data_source, time_range, extra_params)
 
+        # Check cache first (with lock)
         with self._lock:
-            # Check cache unless force_refresh is requested
             if not force_refresh:
                 cached_data = self._read_cache(cache_key)
                 if cached_data is not None:
                     return cached_data
 
-            # Fetch fresh data
-            data = fetch_func()
+        # Fetch fresh data WITHOUT holding the lock (allows concurrent fetches)
+        data = fetch_func()
 
-            # Store in cache
-            if data is not None:
+        # Store in cache (with lock)
+        if data is not None:
+            with self._lock:
                 self._write_cache(cache_key, data, data_source, time_range, extra_params)
 
-            return data
+        return data
 
     def _read_cache(self, cache_key: str) -> Optional[Any]:
         """Read data from cache if valid.

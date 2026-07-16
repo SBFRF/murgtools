@@ -23,7 +23,7 @@ import tifffile
 
 from murgtools.utils import geoprocess as gp, sblib as sb
 from murgtools import config
-from murgtools.cache import DataCache, get_cache
+from murgtools.cache import DataCache
 from murgtools.exceptions import InvalidGaugeError
 
 def gettime(allEpoch, epochStart, epochEnd, indexRef=0):
