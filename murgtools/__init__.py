@@ -4,6 +4,7 @@ from .getdata import getObs, getDataTestBed, gettime, getnc, removeDuplicatesFro
 from .getdata import forecastData, getSatelliteImagery, alt_PlotData
 from .getdata import getArgusImagery, threadGetArgusImagery
 from .plotting import conditions_plot, bin_data
+from .cache import DataCache, get_cache, enable_cache, disable_cache, clear_cache
 
 __all__ = [
     "getObs",
@@ -18,4 +19,10 @@ __all__ = [
     "alt_PlotData",
     "conditions_plot",
     "bin_data",
+    # Cache functions
+    "DataCache",
+    "get_cache",
+    "enable_cache",
+    "disable_cache",
+    "clear_cache",
 ]

@@ -89,6 +89,23 @@ TIME_UNITS = 'seconds since 1970-01-01 00:00:00'
 ARGUS_IMAGE_TYPES = ('timex', 'var', 'snap', 'bright', 'dark')
 
 # =============================================================================
+# Data Cache Configuration
+# =============================================================================
+# Caching is OFF by default. Users must explicitly enable it.
+# Cache stores retrieved data to disk to avoid repeated network requests.
+
+# Default cache directory (user can override)
+DEFAULT_CACHE_DIR = '/data/getdata'
+
+# Default cache TTL in days (6 months = ~180 days)
+DEFAULT_CACHE_TTL_DAYS = 180
+
+# Environment variable names for configuration overrides
+ENV_CACHE_ENABLED = 'MURGTOOLS_CACHE_ENABLED'
+ENV_CACHE_DIR = 'MURGTOOLS_CACHE_DIR'
+ENV_CACHE_TTL_DAYS = 'MURGTOOLS_CACHE_TTL_DAYS'
+
+# =============================================================================
 # Helper Functions
 # =============================================================================
 
