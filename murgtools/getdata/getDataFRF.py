@@ -124,6 +124,178 @@ def open_dataset_with_retry(url, max_attempts=None, retry_delay=5):
     return None
 
 
+# =============================================================================
+# Gauge URL Lookup Tables (O(1) dictionary lookup instead of O(n) if-elif chain)
+# =============================================================================
+
+# Wave gauge URL lookup table - all keys should be lowercase for case-insensitive matching
+_WAVE_GAUGE_URLS = {
+    # 26m waverider
+    '0': 'oceanography/waves/waverider-26m/waverider-26m.ncml',
+    'waverider-26m': 'oceanography/waves/waverider-26m/waverider-26m.ncml',
+    '26m': 'oceanography/waves/waverider-26m/waverider-26m.ncml',
+    # 17m waverider
+    '1': 'oceanography/waves/waverider-17m/waverider-17m.ncml',
+    'waverider-17m': 'oceanography/waves/waverider-17m/waverider-17m.ncml',
+    '17m': 'oceanography/waves/waverider-17m/waverider-17m.ncml',
+    # 11m AWAC
+    '2': 'oceanography/waves/awac-11m/awac-11m.ncml',
+    'awac-11m': 'oceanography/waves/awac-11m/awac-11m.ncml',
+    '11m': 'oceanography/waves/awac-11m/awac-11m.ncml',
+    # 8m AWAC
+    '3': 'oceanography/waves/awac-8m/awac-8m.ncml',
+    'awac-8m': 'oceanography/waves/awac-8m/awac-8m.ncml',
+    # 6m AWAC
+    '4': 'oceanography/waves/awac-6m/awac-6m.ncml',
+    'awac-6m': 'oceanography/waves/awac-6m/awac-6m.ncml',
+    'awac 6m': 'oceanography/waves/awac-6m/awac-6m.ncml',
+    # 4.5m AWAC
+    '5': 'oceanography/waves/awac-4.5m/awac-4.5m.ncml',
+    'awac-4.5m': 'oceanography/waves/awac-4.5m/awac-4.5m.ncml',
+    'awac_4.5m': 'oceanography/waves/awac-4.5m/awac-4.5m.ncml',
+    # 3.5m Aquadopp
+    '6': 'oceanography/waves/adop-3.5m/adop-3.5m.ncml',
+    'adop-3.5m': 'oceanography/waves/adop-3.5m/adop-3.5m.ncml',
+    'aquadopp 3.5m': 'oceanography/waves/adop-3.5m/adop-3.5m.ncml',
+    # 2m Aquadopp
+    '7': 'oceanography/waves/adop01/adop01.ncml',
+    'adop-2m': 'oceanography/waves/adop01/adop01.ncml',
+    # xp340m pressure
+    'xp340m': 'oceanography/waves/xp340m/xp340m.ncml',
+    'xp340': 'oceanography/waves/xp340m/xp340m.ncml',
+    # xp250m pressure - NOTE: '8' appears in both xp250m and xp200m in original code,
+    # but if-elif means first match wins, so '8' -> xp250m
+    '8': 'oceanography/waves/xp250m/xp250m.ncml',
+    'xp250m': 'oceanography/waves/xp250m/xp250m.ncml',
+    'xp250': 'oceanography/waves/xp250m/xp250m.ncml',
+    # xp200m pressure (use explicit 'xp200m' or 'xp200' keys, not '8')
+    'xp200m': 'oceanography/waves/xp200m/xp200m.ncml',
+    'xp200': 'oceanography/waves/xp200m/xp200m.ncml',
+    # xp150m pressure
+    '9': 'oceanography/waves/xp150m/xp150m.ncml',
+    'xp150m': 'oceanography/waves/xp150m/xp150m.ncml',
+    'xp150': 'oceanography/waves/xp150m/xp150m.ncml',
+    # xp125m pressure
+    '10': 'oceanography/waves/xp125m/xp125m.ncml',
+    'xp125m': 'oceanography/waves/xp125m/xp125m.ncml',
+    'xp125': 'oceanography/waves/xp125m/xp125m.ncml',
+    # xp100m pressure
+    '11': 'oceanography/waves/xp100m/xp100m.ncml',
+    'xp100m': 'oceanography/waves/xp100m/xp100m.ncml',
+    # 8m array
+    '12': 'oceanography/waves/8m-array/8m-array.ncml',
+    '8m array': 'oceanography/waves/8m-array/8m-array.ncml',
+    '8m-array': 'oceanography/waves/8m-array/8m-array.ncml',
+    # Signature sensors
+    'sig940-300': 'oceanography/waves/sig940-300/sig940-300.ncml',
+    '940-300': 'oceanography/waves/sig940-300/sig940-300.ncml',
+    'sig769-300': 'oceanography/waves/sig769-300/sig769-300.ncml',
+    '769-300': 'oceanography/waves/sig769-300/sig769-300.ncml',
+    'sig940-400': 'oceanography/waves/sig940-400/sig940-400.ncml',
+    '940-400': 'oceanography/waves/sig940-400/sig940-400.ncml',
+    'sig940-600': 'oceanography/waves/sig940-600/sig940-600.ncml',
+    '940-600': 'oceanography/waves/sig940-600/sig940-600.ncml',
+    # AWAC at jetty pier
+    'awac-jpier-11m': 'oceanography/waves/awac-jpier-11m/awac-jpier-11m.ncml',
+    'awac-jpier': 'oceanography/waves/awac-jpier-11m/awac-jpier-11m.ncml',
+    'jpier-11m': 'oceanography/waves/awac-jpier-11m/awac-jpier-11m.ncml',
+    # New waveriders
+    'waverider-17m-1d': 'oceanography/waves/waverider-17m-1d/waverider-17m-1d.ncml',
+    '17m-1d': 'oceanography/waves/waverider-17m-1d/waverider-17m-1d.ncml',
+    'waverider-20m': 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml',
+    'waverider-20m-1d': 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml',
+    '20m': 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml',
+    '20m-1d': 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml',
+    # Paros pressure sensors
+    'paros-200-940m': 'oceanography/waves/paros940-200/paros940-200.ncml',
+    'paros940-200': 'oceanography/waves/paros940-200/paros940-200.ncml',
+    'paros-250-940m': 'oceanography/waves/paros940-250/paros940-250.ncml',
+    'paros940-250': 'oceanography/waves/paros940-250/paros940-250.ncml',
+    'paros-340x-940y-top': 'oceanography/waves/paros-340x-940y-top/paros-340x-940y-top.ncml',
+    # Lidar wave gauges - 140m
+    'lidarwavegauge140': 'oceanography/waves/lidarWaveGauge140/lidarWaveGauge140.ncml',
+    'lidargauge140': 'oceanography/waves/lidarWaveGauge140/lidarWaveGauge140.ncml',
+    'lidarwavegauge140m': 'oceanography/waves/lidarWaveGauge140/lidarWaveGauge140.ncml',
+    'lidargauge140m': 'oceanography/waves/lidarWaveGauge140/lidarWaveGauge140.ncml',
+    # Lidar wave gauges - 110m
+    'lidarwavegauge110': 'oceanography/waves/lidarWaveGauge110/lidarWaveGauge110.ncml',
+    'lidargauge110': 'oceanography/waves/lidarWaveGauge110/lidarWaveGauge110.ncml',
+    'lidarwavegauge110m': 'oceanography/waves/lidarWaveGauge110/lidarWaveGauge110.ncml',
+    'lidargauge110m': 'oceanography/waves/lidarWaveGauge110/lidarWaveGauge110.ncml',
+    # Lidar wave gauges - 100m
+    'lidarwavegauge100': 'oceanography/waves/lidarWaveGauge100/lidarWaveGauge100.ncml',
+    'lidargauge100': 'oceanography/waves/lidarWaveGauge100/lidarWaveGauge100.ncml',
+    'lidarwavegauge100m': 'oceanography/waves/lidarWaveGauge100/lidarWaveGauge100.ncml',
+    'lidargauge100m': 'oceanography/waves/lidarWaveGauge100/lidarWaveGauge100.ncml',
+    # Lidar wave gauges - 90m
+    'lidarwavegauge90': 'oceanography/waves/lidarWaveGauge90/lidarWaveGauge90.ncml',
+    'lidargauge90': 'oceanography/waves/lidarWaveGauge90/lidarWaveGauge90.ncml',
+    'lidarwavegauge90m': 'oceanography/waves/lidarWaveGauge90/lidarWaveGauge90.ncml',
+    'lidargauge90m': 'oceanography/waves/lidarWaveGauge90/lidarWaveGauge90.ncml',
+    'lidarwavegauge090': 'oceanography/waves/lidarWaveGauge090/lidarWaveGauge090.ncml',
+    # Lidar wave gauges - 80m
+    'lidarwavegauge80': 'oceanography/waves/lidarWaveGauge80/lidarWaveGauge80.ncml',
+    'lidargauge80': 'oceanography/waves/lidarWaveGauge80/lidarWaveGauge80.ncml',
+    'lidarwavegauge80m': 'oceanography/waves/lidarWaveGauge80/lidarWaveGauge80.ncml',
+    'lidargauge80m': 'oceanography/waves/lidarWaveGauge80/lidarWaveGauge80.ncml',
+    'lidarwavegauge080': 'oceanography/waves/lidarWaveGauge080/lidarWaveGauge080.ncml',
+    # Oregon inlet
+    'oregoninlet': 'oceanography/waves/waverider-oregon-inlet-nc/waverider-oregon-inlet-nc.ncml',
+    'oi': 'oceanography/waves/waverider-oregon-inlet-nc/waverider-oregon-inlet-nc.ncml',
+}
+
+# Water level gauge lookup table - maps to (gname, dataloc) tuples
+# Keys include both integer and string variants for compatibility
+_WL_GAUGE_CONFIG = {
+    # 11m AWAC
+    2: ('AWAC 11m', 'oceanography/waves/awac-11m/awac-11m.ncml'),
+    'AWAC-11m': ('AWAC 11m', 'oceanography/waves/awac-11m/awac-11m.ncml'),
+    'awac-11m': ('AWAC 11m', 'oceanography/waves/awac-11m/awac-11m.ncml'),
+    'Awac-11m': ('AWAC 11m', 'oceanography/waves/awac-11m/awac-11m.ncml'),
+    # 8m AWAC
+    3: ('AWAC 8m', 'oceanography/waves/awac-8m/awac-8m.ncml'),
+    'awac-8m': ('AWAC 8m', 'oceanography/waves/awac-8m/awac-8m.ncml'),
+    'AWAC-8m': ('AWAC 8m', 'oceanography/waves/awac-8m/awac-8m.ncml'),
+    # 6m AWAC
+    4: ('AWAC 6m', 'oceanography/waves/awac-6m/awac-6m.ncml'),
+    'awac-6m': ('AWAC 6m', 'oceanography/waves/awac-6m/awac-6m.ncml'),
+    'AWAC-6m': ('AWAC 6m', 'oceanography/waves/awac-6m/awac-6m.ncml'),
+    # 4.5m AWAC
+    5: ('AWAC 4.5m', 'oceanography/waves/awac-4.5m/awac-4.5m.ncml'),
+    'awac-4.5m': ('AWAC 4.5m', 'oceanography/waves/awac-4.5m/awac-4.5m.ncml'),
+    'Awac-4.5m': ('AWAC 4.5m', 'oceanography/waves/awac-4.5m/awac-4.5m.ncml'),
+    'awac_4.5m': ('AWAC 4.5m', 'oceanography/waves/awac-4.5m/awac-4.5m.ncml'),
+    # 3.5m Aquadopp
+    6: ('Aquadopp 3.5m', 'oceanography/waves/adop-3.5m/adop-3.5m.ncml'),
+    'adop-3.5m': ('Aquadopp 3.5m', 'oceanography/waves/adop-3.5m/adop-3.5m.ncml'),
+    'aquadopp 3.5m': ('Aquadopp 3.5m', 'oceanography/waves/adop-3.5m/adop-3.5m.ncml'),
+    # 2m Aquadopp
+    7: ('Aquadopp01 - 2m', 'oceanography/waves/adop01/adop01.ncml'),
+    'adop-2m': ('Aquadopp01 - 2m', 'oceanography/waves/adop01/adop01.ncml'),
+    # xp200m pressure
+    8: ('Paros xp200m', 'oceanography/waves/xp200m/xp200m.ncml'),
+    'xp200m': ('Paros xp200m', 'oceanography/waves/xp200m/xp200m.ncml'),
+    'xp200': ('Paros xp200m', 'oceanography/waves/xp200m/xp200m.ncml'),
+    # xp150m pressure
+    9: ('Paros xp150m', 'oceanography/waves/xp150m/xp150m.ncml'),
+    'xp150m': ('Paros xp150m', 'oceanography/waves/xp150m/xp150m.ncml'),
+    'xp150': ('Paros xp150m', 'oceanography/waves/xp150m/xp150m.ncml'),
+    # xp125m pressure
+    10: ('Paros xp125m', 'oceanography/waves/xp125m/xp125m.ncml'),
+    'xp125m': ('Paros xp125m', 'oceanography/waves/xp125m/xp125m.ncml'),
+    'xp125': ('Paros xp125m', 'oceanography/waves/xp125m/xp125m.ncml'),
+    # xp100m pressure
+    11: ('Paros xp100m', 'oceanography/waves/xp100m/xp100m.ncml'),
+    'xp100m': ('Paros xp100m', 'oceanography/waves/xp100m/xp100m.ncml'),
+    # 8m array
+    12: ('8m array', 'oceanography/waves/8m-array/8m-array.ncml'),
+    '8m-Array': ('8m array', 'oceanography/waves/8m-array/8m-array.ncml'),
+    '8m Array': ('8m array', 'oceanography/waves/8m-array/8m-array.ncml'),
+    '8m array': ('8m array', 'oceanography/waves/8m-array/8m-array.ncml'),
+    '8m-array': ('8m array', 'oceanography/waves/8m-array/8m-array.ncml'),
+}
+
+
 def gettime(allEpoch, epochStart, epochEnd, indexRef=0):
     """This function opens the netcdf file, and retrieves time.
 
@@ -1478,157 +1650,49 @@ class getObs:
     def _waveGaugeURLlookup(self, gaugenumber):
         """A lookup table function that sets the URL backend for get wave spec and get wave gauge locations.
 
+        Uses O(1) dictionary lookup via module-level _WAVE_GAUGE_URLS table.
+
         Args:
           gaugenumber: a string or number that refers to a specific gauge and will set a url
-                Available values inclue:
+                Available values include:
 
                 26m waverider    can be [0, 'waverider-26m', 'Waverider-26m', '26m']
-
                 17m waverider    can be [1, 'Waverider-17m', 'waverider-17m']
-
                 11m AWAC         can be [2, 'AWAC-11m', 'awac-11m', 'Awac-11m']
-
                 8m AWAC          can be [3, 'awac-8m', 'AWAC-8m']
-
                 6m AWAC          can be [4, 'awac-6m', 'AWAC-6m']
-
                 4.5m AWAC        can be [5, 'awac-4.5m', 'Awac-4.5m']
-
                 3.5m aquadopp    can be [6, 'adop-3.5m', 'aquadopp 3.5m']
-
                 340m pressure    can be ['xp340m', 'xp340']
-
-                250m pressure    can be ['8', 'xp250m', 'xp250']
-
-                200m pressure    can be [8, 'xp200m', 'xp200']
-
+                250m pressure    can be [8, 'xp250m', 'xp250']
+                200m pressure    can be ['xp200m', 'xp200']
                 150m pressure    can be [9, 'xp150m', 'xp150']
-
                 125m pressure    can be [10, 'xp125m', 'xp125']
-
                 100m pressure    can be [11, 'xp100m']
-
-                8m array         can be [8, '8m-Array', '8m Array', '8m array', '8m-array']
-
-                oregon inlet WR  can be ['oregonInlet', 'OI', 'oi']
-
-                signature @ yFRF 940 xFRF 300 can be ['sig940-300', '940-300']
-
-                signature @ yFRF 769 xFRF 300 can be ['sig769-300', '769-300']
-
-                pressure @ yFRF 940 xFRF 200 can be ['paros-200-940m', 'paros-200-940m']
-
-                pressure @ yFRF 940 xFRF 200 can be ['paros-200-940m', 'paros-200-940m']
-
-                lidar wave gauge @ xFRF 140 can be ['lidarwavegauge140', 'lidargauge140', 'lidarwavegauge140m',
-                                                    'lidargauge140m']
-
-                lidar wave gauge @ xFRF 110 can be ['lidarwavegauge110', 'lidargauge110', 'lidarwavegauge110m',
-                                                    'lidargauge110m']
-
-                lidar wave gauge @ xFRF 100 can be ['lidarwavegauge100', 'lidargauge100', 'lidarwavegauge100m',
-                                                    'lidargauge100m']
-
-                lidar wave gauge @ xFRF 90 can be ['lidarwavegauge90', 'lidargauge90', 'lidarwavegauge90m',
-                                                   'lidargauge90m']
-
-                lidar wave gauge @ xFRF 80 can be ['lidarwavegauge80', 'lidargauge80', 'lidarwavegauge80m',
-                                                   'lidargauge80m']
+                8m array         can be [12, '8m-Array', '8m Array', '8m array', '8m-array']
+                oregon inlet WR  can be ['oregonInlet', 'oi']
+                signature sensors can be ['sig940-300', '940-300', 'sig769-300', '769-300', etc.]
+                paros sensors    can be ['paros-200-940m', 'paros940-200', etc.]
+                lidar gauges     can be ['lidarwavegauge140', 'lidargauge140', etc.]
 
         Returns:
           Nothing, this just sets the self.dataloc data member
 
-        """
-        if str(gaugenumber).lower() in ['0', 'waverider-26m', '26m']:
-            # 26 m wave rider
-            self.dataloc = 'oceanography/waves/waverider-26m/waverider-26m.ncml'  #
-            # 'oceanography/waves/waverider430/waverider430.ncml'  # 26m buoy
-        elif str(gaugenumber).lower() in ['1', 'waverider-17m', '17m']:
-            # 2D 17m waverider
-            self.dataloc = 'oceanography/waves/waverider-17m/waverider-17m.ncml'  # 17 m buoy
-        elif str(gaugenumber).lower() in ['2', 'awac-11m', '11m']:
-            self.dataloc = 'oceanography/waves/awac-11m/awac-11m.ncml'
-        elif str(gaugenumber).lower() in ['3', 'awac-8m']:
-            self.dataloc = 'oceanography/waves/awac-8m/awac-8m.ncml'
-        elif str(gaugenumber).lower() in ['4', 'awac-6m', 'awac 6m']:
-            self.dataloc = 'oceanography/waves/awac-6m/awac-6m.ncml'
-        elif str(gaugenumber).lower() in ['5', 'awac-4.5m', 'awac_4.5m']:
-            self.dataloc = 'oceanography/waves/awac-4.5m/awac-4.5m.ncml'
-        elif str(gaugenumber).lower() in ['6', 'adop-3.5m', 'aquadopp 3.5m']:
-            self.dataloc = 'oceanography/waves/adop-3.5m/adop-3.5m.ncml'
-        elif str(gaugenumber).lower() in ['7', 'adop-2m']:
-            self.dataloc = 'oceanography/waves/adop01/adop01.ncml'
-        elif str(gaugenumber).lower() in ['xp340m', 'xp340']:
-            self.dataloc = "oceanography/waves/xp340m/xp340m.ncml"
-        elif str(gaugenumber).lower() in ['8', 'xp250m', 'xp250']:
-            self.dataloc = 'oceanography/waves/xp250m/xp250m.ncml'
-        elif str(gaugenumber).lower() in ['8', 'xp200m', 'xp200']:
-            self.dataloc = 'oceanography/waves/xp200m/xp200m.ncml'
-        elif str(gaugenumber).lower() in ['9', 'xp150m', 'xp150']:
-            self.dataloc = 'oceanography/waves/xp150m/xp150m.ncml'
-        elif str(gaugenumber).lower() in ['10', 'xp125m', 'xp125']:
-            self.dataloc = 'oceanography/waves/xp125m/xp125m.ncml'
-        elif str(gaugenumber).lower() in ['11', 'xp100m']:
-            self.dataloc = 'oceanography/waves/xp100m/xp100m.ncml'
-        elif str(gaugenumber).lower() in ['12', '8m array', '8m-array']:
-            self.dataloc = 'oceanography/waves/8m-array/8m-array.ncml'
-        elif str(gaugenumber).lower() in ['sig940-300', '940-300']:
-            self.dataloc = 'oceanography/waves/sig940-300/sig940-300.ncml'
-        elif str(gaugenumber).lower() in ['sig769-300', '769-300']:
-            self.dataloc = 'oceanography/waves/sig769-300/sig769-300.ncml'
-        elif str(gaugenumber).lower() in ['sig940-400', '940-400']:
-            self.dataloc = 'oceanography/waves/sig940-400/sig940-400.ncml'
-        elif str(gaugenumber).lower() in ['sig940-600', '940-600']:
-            self.dataloc = 'oceanography/waves/sig940-600/sig940-600.ncml'
-        # AWAC at jetty pier
-        elif str(gaugenumber).lower() in ['awac-jpier-11m', 'awac-jpier', 'jpier-11m']:
-            self.dataloc = 'oceanography/waves/awac-jpier-11m/awac-jpier-11m.ncml'
-        # New waveriders
-        elif str(gaugenumber).lower() in ['waverider-17m-1d', '17m-1d']:
-            self.dataloc = 'oceanography/waves/waverider-17m-1d/waverider-17m-1d.ncml'
-        elif str(gaugenumber).lower() in ['waverider-20m', 'waverider-20m-1d', '20m', '20m-1d']:
-            self.dataloc = 'oceanography/waves/waverider-20m-1d/waverider-20m-1d.ncml'
-        # Paros pressure sensors - support both naming conventions
-        elif str(gaugenumber).lower() in ['paros-200-940m', 'paros940-200']:
-            self.dataloc = 'oceanography/waves/paros940-200/paros940-200.ncml'
-        elif str(gaugenumber).lower() in ['paros-250-940m', 'paros940-250']:
-            self.dataloc = 'oceanography/waves/paros940-250/paros940-250.ncml'
-        elif str(gaugenumber).lower() in ['paros-340x-940y-top']:
-            self.dataloc = 'oceanography/waves/paros-340x-940y-top/paros-340x-940y-top.ncml'
-        # lidar wave gauges - 140 m
-        elif str(gaugenumber).lower() in ['lidarwavegauge140', 'lidargauge140',
-                                          'lidarwavegauge140m', 'lidargauge140m']:
-            self.dataloc = 'oceanography/waves/lidarWaveGauge140/lidarWaveGauge140.ncml'
-        # lidar wave gauges - 110 m
-        elif str(gaugenumber).lower() in ['lidarwavegauge110', 'lidargauge110',
-                                          'lidarwavegauge110m', 'lidargauge110m']:
-            self.dataloc = 'oceanography/waves/lidarWaveGauge110/lidarWaveGauge110.ncml'
-        # lidar wave gauges - 100 m
-        elif str(gaugenumber).lower() in ['lidarwavegauge100', 'lidargauge100',
-                                          'lidarwavegauge100m', 'lidargauge100m']:
-            self.dataloc = 'oceanography/waves/lidarWaveGauge100/lidarWaveGauge100.ncml'
-        # lidar wave gauges - 90 m
-        elif str(gaugenumber).lower() in ['lidarwavegauge90', 'lidargauge90', 'lidarwavegauge90m',
-                                          'lidargauge90m']:
-            self.dataloc = 'oceanography/waves/lidarWaveGauge90/lidarWaveGauge90.ncml'
-        # lidar wave gauges - 80 m
-        elif str(gaugenumber).lower() in ['lidarwavegauge80', 'lidargauge80', 'lidarwavegauge80m',
-                                          'lidargauge80m']:
-            self.dataloc = 'oceanography/waves/lidarWaveGauge80/lidarWaveGauge80.ncml'
-        elif str(gaugenumber).lower() in ['oregoninlet', 'oi']:
-            self.dataloc = 'oceanography/waves/waverider-oregon-inlet-nc/waverider-oregon-inlet' \
-                           '-nc.ncml'
-        elif str(gaugenumber).lower() in ['lidarwavegauge080', 'lidarwavegauge80']:
-            self.dataloc = "oceanography/waves/lidarWaveGauge080/lidarWaveGauge080.ncml"
-        elif str(gaugenumber).lower() in ['lidarwavegauge090', 'lidarwavegauge90']:
-            self.dataloc = "oceanography/waves/lidarWaveGauge090/lidarWaveGauge090.ncml"
-        elif str(gaugenumber).lower() in ['lidarwavegauge100']:
-            self.dataloc = "oceanography/waves/lidarWaveGauge100/lidarWaveGauge100.ncml"
-        elif str(gaugenumber).lower() in ['lidarwavegauge110']:
-            self.dataloc = "oceanography/waves/lidarWaveGauge110/lidarWaveGauge110.ncml"
-        elif str(gaugenumber).lower() in ['lidarwavegauge140']:
-            self.dataloc = "oceanography/waves/lidarWaveGauge140/lidarWaveGauge140.ncml"
+        Raises:
+            InvalidGaugeError: If gaugenumber is None or not a valid gauge identifier.
 
+        """
+        # Input validation
+        if gaugenumber is None:
+            raise InvalidGaugeError(None, message="Invalid gauge: 'None'. Gauge number cannot be None.")
+
+        # Normalize to lowercase string for case-insensitive lookup
+        key = str(gaugenumber).lower()
+
+        # O(1) dictionary lookup
+        url = _WAVE_GAUGE_URLS.get(key)
+        if url is not None:
+            self.dataloc = url
         else:
             self.gname = 'There Are no Gauge numbers here'
             raise InvalidGaugeError(gaugenumber, message='Bad gauge name. See getWaveGaugeLoc for valid options.')
@@ -1636,8 +1700,10 @@ class getObs:
     def _wlGageURLlookup(self, gaugenumber):
         """A lookup table function that sets the URL backend for getGageWL.
 
+        Uses O(1) dictionary lookup via module-level _WL_GAUGE_CONFIG table.
+
         Args:
-            gaugenumber: a string or number that refers to a specific gauge and will set a url
+            gaugenumber: a string or integer that refers to a specific gauge and will set a url
                Available values include:
                    11m AWAC         can be [2, 'AWAC-11m', 'awac-11m', 'Awac-11m']
                    8m AWAC          can be [3, 'awac-8m', 'AWAC-8m']
@@ -1648,45 +1714,23 @@ class getObs:
                    150m pressure    can be [9, 'xp150m', 'xp150']
                    125m pressure    can be [10, 'xp125m', 'xp125']
                    100m pressure    can be [11, 'xp100m']
-                   8m array         can be [8, '8m-Array', '8m Array', '8m array', '8m-array']
+                   8m array         can be [12, '8m-Array', '8m Array', '8m array', '8m-array']
 
         Returns:
-             Nothing, this just sets the self.dataloc data member
+             Nothing, this just sets the self.dataloc and self.gname data members
+
+        Raises:
+            InvalidGaugeError: If gaugenumber is None or not a valid gauge identifier.
 
         """
-        if gaugenumber in [2, 'AWAC-11m', 'awac-11m', 'Awac-11m']:
-            gname = 'AWAC 11m'
-            self.dataloc = 'oceanography/waves/awac-11m/awac-11m.ncml'
-        elif gaugenumber in [3, 'awac-8m', 'AWAC-8m']:
-            self.gname = 'AWAC 8m'
-            self.dataloc = 'oceanography/waves/awac-8m/awac-8m.ncml'
-        elif gaugenumber in [4, 'awac-6m', 'AWAC-6m']:
-            self.gname = 'AWAC 6m'
-            self.dataloc = 'oceanography/waves/awac-6m/awac-6m.ncml'
-        elif gaugenumber in [5, 'awac-4.5m', 'Awac-4.5m', 'awac_4.5m']:
-            self.gname = 'AWAC 4.5m'
-            self.dataloc = 'oceanography/waves/awac-4.5m/awac-4.5m.ncml'
-        elif gaugenumber in [6, 'adop-3.5m', 'aquadopp 3.5m']:
-            self.gname = 'Aquadopp 3.5m'
-            self.dataloc = 'oceanography/waves/adop-3.5m/adop-3.5m.ncml'
-        elif gaugenumber in [7, 'adop-2m']:
-            self.gname = 'Aquadopp01 - 2m'
-            self.dataloc = 'oceanography/waves/adop01/adop01.ncml'
-        elif gaugenumber in [8, 'xp200m', 'xp200']:
-            self.gname = 'Paros xp200m'
-            self.dataloc = 'oceanography/waves/xp200m/xp200m.ncml'
-        elif gaugenumber in [9, 'xp150m', 'xp150']:
-            self.gname = 'Paros xp150m'
-            self.dataloc = 'oceanography/waves/xp150m/xp150m.ncml'
-        elif gaugenumber in [10, 'xp125m', 'xp125']:
-            self.gname = 'Paros xp125m'
-            self.dataloc = 'oceanography/waves/xp125m/xp125m.ncml'
-        elif gaugenumber in [11, 'xp100m']:
-            self.gname = 'Paros xp100m'
-            self.dataloc = 'oceanography/waves/xp100m/xp100m.ncml'
-        elif gaugenumber in [12, '8m-Array', '8m Array', '8m array', '8m-array']:
-            self.gname = "8m array"
-            self.dataloc = 'oceanography/waves/8m-array/8m-array.ncml'
+        # Input validation
+        if gaugenumber is None:
+            raise InvalidGaugeError(None, message="Invalid gauge: 'None'. Gauge number cannot be None.")
+
+        # O(1) dictionary lookup (supports both int and string keys)
+        config_tuple = _WL_GAUGE_CONFIG.get(gaugenumber)
+        if config_tuple is not None:
+            self.gname, self.dataloc = config_tuple
         else:
             self.gname = 'There Are no Gauge numbers here'
             raise InvalidGaugeError(gaugenumber, message='Bad gauge name. See _wlGageURLlookup for valid options.')
