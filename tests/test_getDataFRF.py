@@ -1606,6 +1606,27 @@ class TestLookupTableDictionaries:
         obs._waveGaugeURLlookup('WaveRider-26m')
         assert 'waverider-26m' in obs.dataloc
 
+    def test_wave_gauge_lookup_8_maps_to_xp250m(self):
+        """Test that '8' maps to xp250m (not xp200m) for backward compatibility.
+
+        In the original if-elif chain, '8' appeared in both xp250m and xp200m
+        conditions, but xp250m was checked first, so '8' -> xp250m. This test
+        ensures the dictionary lookup preserves that behavior.
+        """
+        from murgtools.getdata.getDataFRF import getObs
+        import datetime as DT
+
+        obs = getObs(DT.datetime(2024, 1, 1), DT.datetime(2024, 1, 2))
+
+        # The key '8' should map to xp250m (first match in original if-elif)
+        obs._waveGaugeURLlookup('8')
+        assert 'xp250m' in obs.dataloc, f"'8' should map to xp250m, got {obs.dataloc}"
+        assert 'xp200m' not in obs.dataloc, f"'8' should NOT map to xp200m"
+
+        # Integer 8 is also normalized to '8' via str().lower()
+        obs._waveGaugeURLlookup(8)
+        assert 'xp250m' in obs.dataloc, f"8 (int) should map to xp250m, got {obs.dataloc}"
+
     def test_wl_gauge_lookup_integer_keys(self):
         """Test that WL gauge lookup works with integer keys."""
         from murgtools.getdata.getDataFRF import getObs
