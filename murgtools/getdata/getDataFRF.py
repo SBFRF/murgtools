@@ -30,7 +30,7 @@ from murgtools.exceptions import InvalidGaugeError
 # =============================================================================
 
 
-def open_dataset_with_fallback(primary_url, fallback_url, error_message=None):
+def open_dataset_with_fallback(primary_url, fallback_url, raise_on_failure=False):
     """Open a NetCDF dataset with automatic fallback to secondary URL.
 
     Attempts to open a NetCDF dataset from the primary URL. If that fails
@@ -40,42 +40,46 @@ def open_dataset_with_fallback(primary_url, fallback_url, error_message=None):
     Args:
         primary_url (str): Primary URL to attempt first (e.g., FRF local server).
         fallback_url (str): Fallback URL if primary fails (e.g., CHL public server).
-        error_message (str, optional): Custom error message to print if both fail.
-            If None, no message is printed on failure.
+        raise_on_failure (bool): If True, raises IOError when both URLs fail.
+            If False (default), returns None on failure.
 
     Returns:
-        netCDF4.Dataset or None: The opened dataset, or None if both URLs fail.
+        netCDF4.Dataset: The opened dataset.
+
+    Raises:
+        IOError: If both URLs fail and raise_on_failure=True.
 
     Example:
         >>> ncfile = open_dataset_with_fallback(
         ...     self.FRFdataloc + self.dataloc,
-        ...     self.chlDataLoc + self.dataloc
+        ...     self.chlDataLoc + self.dataloc,
+        ...     raise_on_failure=True
         ... )
     """
     try:
         return nc.Dataset(primary_url)
     except (IOError, OSError):
-        try:
-            return nc.Dataset(fallback_url)
-        except (IOError, OSError):
-            if error_message:
-                print(error_message)
-            return None
+        pass  # Fall through to try fallback
+
+    try:
+        return nc.Dataset(fallback_url)
+    except (IOError, OSError) as e:
+        if raise_on_failure:
+            raise IOError(f"Failed to open dataset from both {primary_url} and {fallback_url}") from e
+        return None
 
 
-def open_dataset_with_retry(url, max_retries=None, retry_delay=5, error_message=None):
+def open_dataset_with_retry(url, max_retries=None, retry_delay=5):
     """Open a NetCDF dataset with retry logic for transient failures.
 
     Attempts to open a NetCDF dataset, retrying on IOError up to max_retries
-    times with a delay between attempts.
+    times with a delay between attempts. Logs progress using the logging module.
 
     Args:
         url (str): URL of the NetCDF file to open.
         max_retries (int, optional): Maximum number of retry attempts.
             Defaults to config.MAX_RETRY_ATTEMPTS.
         retry_delay (int or float): Seconds to wait between retries. Default 5.
-        error_message (str, optional): Custom error message format string.
-            Can include {url}, {attempt}, {max_retries} placeholders.
 
     Returns:
         netCDF4.Dataset or None: The opened dataset, or None if all retries fail.
@@ -90,15 +94,17 @@ def open_dataset_with_retry(url, max_retries=None, retry_delay=5, error_message=
     if max_retries is None:
         max_retries = config.MAX_RETRY_ATTEMPTS
 
+    last_error = None
     for attempt in range(max_retries):
         try:
             return nc.Dataset(url)
-        except (IOError, OSError):
+        except (IOError, OSError) as e:
+            last_error = e
             if attempt < max_retries - 1:
-                msg = error_message or 'Error reading {url}, trying again {attempt}/{max_retries}'
-                print(msg.format(url=url, attempt=attempt + 1, max_retries=max_retries))
+                logging.warning(f"Error reading {url}, attempt {attempt + 1}/{max_retries}. Retrying...")
                 time.sleep(retry_delay)
 
+    logging.error(f"Failed to open {url} after {max_retries} attempts: {last_error}")
     return None
 
 
@@ -1597,10 +1603,9 @@ class getObs:
         self._waveGaugeURLlookup(gaugenumber)
         ncfile = open_dataset_with_fallback(
             self.FRFdataloc + self.dataloc,
-            self.chlDataLoc + self.dataloc
+            self.chlDataLoc + self.dataloc,
+            raise_on_failure=True
         )
-        if ncfile is None:
-            raise IOError(f"Could not open dataset for gauge {gaugenumber}")
         out = {'Lat': ncfile['latitude'][:],
                'Lon': ncfile['longitude'][:]}
         return out

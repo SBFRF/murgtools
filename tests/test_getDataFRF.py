@@ -43,8 +43,8 @@ class TestOpenDatasetWithFallback:
             mock_dataset.assert_any_call('http://primary/data.nc')
             mock_dataset.assert_any_call('http://fallback/data.nc')
 
-    def test_returns_none_when_both_fail(self):
-        """Test that None is returned when both URLs fail."""
+    def test_returns_none_when_both_fail_default(self):
+        """Test that None is returned when both URLs fail (default behavior)."""
         with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
             mock_dataset.side_effect = IOError("Failed")
 
@@ -52,19 +52,20 @@ class TestOpenDatasetWithFallback:
 
             assert result is None
 
-    def test_prints_error_message_when_both_fail(self, capsys):
-        """Test that error message is printed when both URLs fail."""
+    def test_raises_when_both_fail_and_raise_on_failure_true(self):
+        """Test that IOError is raised when both URLs fail and raise_on_failure=True."""
         with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
             mock_dataset.side_effect = IOError("Failed")
 
-            open_dataset_with_fallback(
-                'http://primary/data.nc',
-                'http://fallback/data.nc',
-                error_message="Custom error message"
-            )
+            with pytest.raises(IOError) as exc_info:
+                open_dataset_with_fallback(
+                    'http://primary/data.nc',
+                    'http://fallback/data.nc',
+                    raise_on_failure=True
+                )
 
-            captured = capsys.readouterr()
-            assert "Custom error message" in captured.out
+            assert "primary" in str(exc_info.value)
+            assert "fallback" in str(exc_info.value)
 
     def test_handles_oserror_as_well_as_ioerror(self):
         """Test that OSError is also caught (Python 3 compatibility)."""
@@ -125,18 +126,32 @@ class TestOpenDatasetWithRetry:
 
                 assert mock_dataset.call_count == config.MAX_RETRY_ATTEMPTS
 
-    def test_prints_error_message_on_retry(self, capsys):
-        """Test that error message is printed on each retry."""
+    def test_logs_warning_on_retry(self, caplog):
+        """Test that warning is logged on each retry attempt."""
+        import logging
         with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
             with patch('murgtools.getdata.getDataFRF.time.sleep'):
                 mock_nc = MagicMock()
                 mock_dataset.side_effect = [IOError("Fail"), mock_nc]
 
-                open_dataset_with_retry('http://server/data.nc', max_retries=2, retry_delay=0)
+                with caplog.at_level(logging.WARNING):
+                    open_dataset_with_retry('http://server/data.nc', max_retries=2, retry_delay=0)
 
-                captured = capsys.readouterr()
-                assert "Error reading" in captured.out
-                assert "http://server/data.nc" in captured.out
+                assert "Error reading" in caplog.text
+                assert "http://server/data.nc" in caplog.text
+
+    def test_logs_error_on_final_failure(self, caplog):
+        """Test that error is logged when all retries fail."""
+        import logging
+        with patch('murgtools.getdata.getDataFRF.nc.Dataset') as mock_dataset:
+            with patch('murgtools.getdata.getDataFRF.time.sleep'):
+                mock_dataset.side_effect = IOError("Always fails")
+
+                with caplog.at_level(logging.ERROR):
+                    result = open_dataset_with_retry('http://server/data.nc', max_retries=2, retry_delay=0)
+
+                assert result is None
+                assert "Failed to open" in caplog.text
 
 
 class TestGettime:
