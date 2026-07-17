@@ -903,7 +903,7 @@ class getObs:
         return self._get_with_cache('currents', fetch_data, cache_params, force_refresh)
 
     def _getCurrents_impl(self, gaugenumber, roundto):
-        """Internal implementation of getCurrents (without caching)."""
+        """Internal implementation of get_currents (without caching)."""
         valid_gauges = [2, 3, 4, 5, 6, 'awac-11m', 'awac-8m', 'awac-6m', 'awac-4.5m', 'awac-5m',
                         'adop-3.5m', 'awac-jpier-11m', 'awac-jpier', 'jpier-11m',
                         'sig769-300', '769-300',
@@ -1050,7 +1050,7 @@ class getObs:
         return self._get_with_cache('wind', fetch_data, cache_params, force_refresh)
 
     def _getWind_impl(self, gaugenumber, collectionlength):
-        """Internal implementation of getWind (without caching)."""
+        """Internal implementation of get_wind (without caching)."""
         # Making gauges flexible
         # different Gauges
         if gaugenumber in ['derived', 'Derived', 0]:
@@ -1180,7 +1180,7 @@ class getObs:
         return self._get_with_cache('waterlevel', fetch_data, cache_params, force_refresh)
 
     def _getWL_impl(self, collectionlength):
-        """Internal implementation of getWL (without caching)."""
+        """Internal implementation of get_wl (without caching)."""
         # this is the back end of the url for waterlevel
         self.dataloc = 'oceanography/waterlevel/eopNoaaTide/eopNoaaTide.ncml'
 
@@ -2176,7 +2176,7 @@ class getObs:
         return self._get_with_cache('altimeter', fetch_data, cache_params, force_refresh)
 
     def _getALT_impl(self, gaugeName, removeMasked):
-        """Internal implementation of getALT (without caching)."""
+        """Internal implementation of get_alt (without caching)."""
         # location of the data
         gauge_list = ['Alt769-150', 'Alt769-200', 'Alt769-250', 'Alt769-300', 'Alt769-350',
                       'Alt861-150', 'Alt861-200', 'Alt861-250', 'Alt861-300', 'Alt861-350',
@@ -4112,7 +4112,7 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
                            channel=None, verbose=True, **kwargs):
     """Extract pixel intensity values from Argus imagery at a specified location.
 
-    This function wraps getArgusImagery to extract pixel intensities over multiple
+    This function wraps get_argus_imagery to extract pixel intensities over multiple
     times and image types. It handles coordinate transformations and returns timestamps
     with pixel values to account for gaps in imagery.
 
@@ -4144,7 +4144,7 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
             - 'gray' or 'grey' or 'bw': Grayscale (weighted average using standard luminance formula)
             - None: Return all RGB channels (default)
         verbose (bool, optional): Enable logging output. Defaults to True.
-        **kwargs: Additional arguments passed to findArgusImagery (e.g.,
+        **kwargs: Additional arguments passed to find_argus_imagery (e.g.,
             search_window_hours, method)
 
     Returns:

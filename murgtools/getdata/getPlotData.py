@@ -39,7 +39,7 @@ def alt_PlotData(name, mod_time, mod_times, THREDDS='FRF'):
 
     try:
         dict = {}
-        alt_data = frf_Data.getALT(name)
+        alt_data = frf_Data.get_alt(name)
         dict['zb'] = alt_data['bottomElev']
         dict['time'] = alt_data['time']
         dict['name'] = alt_data['gageName']
@@ -186,7 +186,7 @@ def CMSF_velData(cmsfDict, station, dThresh=None):
                     'time' - this needs to be in epochtime
                     'aveE' - average eastward velocity
                     'aveN' - average northward velocity
-        station: this is the stationname that will get handed to getCurrents, a gagenumber would (should?) also work
+        station: this is the stationname that will get handed to get_currents, a gagenumber would (should?) also work
 
     Returns:
          dictionary with keys:
