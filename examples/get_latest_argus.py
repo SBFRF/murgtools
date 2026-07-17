@@ -7,7 +7,7 @@ and saves it as a GeoTIFF. Supports multiple image types: 'bright', 'timex', 'sn
 import argparse
 import datetime as DT
 import os
-from murgtools.getdata import findArgusImagery
+from murgtools.getdata import find_argus_imagery
 
 
 def main():
@@ -30,7 +30,7 @@ def main():
 
     # Use method=1 (backward search) to find the most recent available image
     # search_window_hours=48 gives a 2-day window to find imagery
-    result = findArgusImagery(
+    result = find_argus_imagery(
         dateOfInterest=utc_time,
         filename=output_file,
         imageType= image_type,

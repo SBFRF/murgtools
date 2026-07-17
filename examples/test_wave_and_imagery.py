@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy as np
 
-from murgtools.getdata import getObs, getSatelliteImagery, findArgusImagery, get_geotiff_extent
+from murgtools.getdata import getObs, getSatelliteImagery, find_argus_imagery, get_geotiff_extent
 from murgtools.utils import geoprocess as gp
 
 
@@ -55,7 +55,7 @@ def main():
     for gauge in gauge_list:
         print(f"  Fetching {gauge}...")
         try:
-            data = obs.getWaveData(gaugenumber=gauge, roundto=30)
+            data = obs.get_wave_data(gaugenumber=gauge, roundto=30)
             if data is not None and 'Hs' in data:
                 wave_data[gauge] = data
                 # Get lat/lon from xFRF/yFRF using geoprocess
@@ -116,10 +116,10 @@ def main():
         tmp_path = tmp.name
 
     try:
-        # Use findArgusImagery with method=1 (nearest in history) to get most recent image
+        # Use find_argus_imagery with method=1 (nearest in history) to get most recent image
         # Using 'bright' (brightest pixels composite) for best visualization
-        argus_result = findArgusImagery(now, filename=tmp_path, imageType='bright',
-                                        search_window_hours=48, method=1)
+        argus_result = find_argus_imagery(now, filename=tmp_path, imageType='bright',
+                                          search_window_hours=48, method=1)
         if argus_result:
             print(f"  Got Argus image from {argus_result['time'].strftime('%Y-%m-%d %H:%M')}")
             print(f"  Shape: {argus_result['image'].shape}")
