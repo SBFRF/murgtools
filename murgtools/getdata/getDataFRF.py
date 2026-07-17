@@ -812,7 +812,7 @@ class getObs:
                             wavespec = sb.reduceDict(wavespec, idx)
                     except(KeyError):
                         pass  # non -directional gauge
-                wavespec = removeDuplicatesFromDictionary(wavespec)
+                wavespec = remove_duplicates_from_dictionary(wavespec)
 
                 return wavespec
 
@@ -832,15 +832,13 @@ class getObs:
                             'name': str(self.ncfile.title), }"""
 
     def get_wave_spec(self, gaugenumber=0, roundto=30, removeBadDataFlag=4, **kwargs):
-        warnings.warn("WARNING: getWaveSpec is depreciated, update to use getWaveData, spec=True")
+        warnings.warn(
+            "get_wave_spec is deprecated, use get_wave_data(..., spec=True) instead",
+            DeprecationWarning,
+            stacklevel=2
+        )
         returnAB = kwargs.get('returnAB', False)
-        specOnly = kwargs.get('specOnly', False)
-        # if specOnly:
-        #     wavedata = self.getWaveData(gaugenumber, roundto, removeBadDataFlag, returnAB=returnAB, spec=True)
-        #     # work around
-        #     return wavedata
-        # else:
-        return self.getWaveData(gaugenumber, roundto, removeBadDataFlag, returnAB=returnAB, spec=True)
+        return self.get_wave_data(gaugenumber, roundto, removeBadDataFlag, returnAB=returnAB, spec=True)
 
     def get_currents(self, gaugenumber=5, roundto=1, force_refresh=False):
         """This function pulls down the currents data from the Thredds Server.
@@ -3439,7 +3437,7 @@ class getDataTestBed:
 
         assert field[var].shape[0] == len(
             field['time']), " the indexing is wrong for pulling down the spatial output"
-        field = removeDuplicatesFromDictionary(field)
+        field = remove_duplicates_from_dictionary(field)
         return field
 
     def getWaveSpecSTWAVE(self, prefix, gaugenumber, local=True, model='STWAVE'):
@@ -3615,7 +3613,7 @@ class getDataTestBed:
             if removeBadWLFlag is not False:
                 idxGood = np.argwhere(qcFlags[:, 2] <= 5).squeeze()
                 wavespec = sb.reduceDict(wavespec, idxGood)
-            return removeDuplicatesFromDictionary(wavespec)
+            return remove_duplicates_from_dictionary(wavespec)
 
         except (RuntimeError, AssertionError) as err:
             print(err)

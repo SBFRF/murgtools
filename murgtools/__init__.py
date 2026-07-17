@@ -3,10 +3,10 @@
 from .getdata import getObs, getDataTestBed, gettime, getnc
 # New snake_case function names (preferred)
 from .getdata import remove_duplicates_from_dictionary
-from .getdata import get_argus_imagery, thread_get_argus_imagery
+from .getdata import get_argus_imagery, thread_get_argus_imagery, find_argus_imagery
 # Deprecated camelCase aliases (backward compatibility)
 from .getdata import removeDuplicatesFromDictionary
-from .getdata import getArgusImagery, threadGetArgusImagery
+from .getdata import getArgusImagery, threadGetArgusImagery, findArgusImagery
 from .getdata import forecastData, getSatelliteImagery, alt_PlotData
 from .plotting import conditions_plot, bin_data
 from .cache import DataCache, get_cache, enable_cache, disable_cache, clear_cache
@@ -20,10 +20,12 @@ __all__ = [
     "remove_duplicates_from_dictionary",
     "get_argus_imagery",
     "thread_get_argus_imagery",
+    "find_argus_imagery",
     # Deprecated camelCase aliases (backward compatibility)
     "removeDuplicatesFromDictionary",
     "getArgusImagery",
     "threadGetArgusImagery",
+    "findArgusImagery",
     # Other exports
     "forecastData",
     "getSatelliteImagery",

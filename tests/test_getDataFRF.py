@@ -1004,11 +1004,11 @@ class TestGetObsGetCurrents:
 
 
 class TestGetObsGetWaveSpec:
-    """Tests for the getObs.getWaveSpec method."""
+    """Tests for the getObs.get_wave_spec method (deprecated)."""
 
     @patch('murgtools.getdata.getDataFRF.nc.date2num')
-    def test_getWaveSpec_emits_deprecation_warning(self, mock_date2num):
-        """Test that getWaveSpec emits a deprecation warning."""
+    def test_get_wave_spec_emits_deprecation_warning(self, mock_date2num):
+        """Test that get_wave_spec emits a deprecation warning."""
         mock_date2num.return_value = 1577836800.0
         d1 = DT.datetime(2020, 1, 1)
         d2 = DT.datetime(2020, 1, 2)
@@ -1016,13 +1016,13 @@ class TestGetObsGetWaveSpec:
         from murgtools.getdata.getDataFRF import getObs
         obs = getObs(d1, d2)
 
-        with pytest.warns(UserWarning, match="getWaveSpec is depreciated"):
-            with patch.object(obs, 'getWaveData', return_value={'test': 'data'}):
-                obs.getWaveSpec()
+        with pytest.warns(DeprecationWarning, match="get_wave_spec is deprecated"):
+            with patch.object(obs, 'get_wave_data', return_value={'test': 'data'}):
+                obs.get_wave_spec()
 
     @patch('murgtools.getdata.getDataFRF.nc.date2num')
-    def test_getWaveSpec_calls_getWaveData_with_spec_true(self, mock_date2num):
-        """Test that getWaveSpec calls getWaveData with spec=True."""
+    def test_get_wave_spec_calls_get_wave_data_with_spec_true(self, mock_date2num):
+        """Test that get_wave_spec calls get_wave_data with spec=True."""
         mock_date2num.return_value = 1577836800.0
         d1 = DT.datetime(2020, 1, 1)
         d2 = DT.datetime(2020, 1, 2)
@@ -1030,11 +1030,11 @@ class TestGetObsGetWaveSpec:
         from murgtools.getdata.getDataFRF import getObs
         obs = getObs(d1, d2)
 
-        with patch.object(obs, 'getWaveData', return_value={'test': 'data'}) as mock_wave:
+        with patch.object(obs, 'get_wave_data', return_value={'test': 'data'}) as mock_wave:
             import warnings
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                result = obs.getWaveSpec(gaugenumber='waverider-26m', roundto=30)
+                result = obs.get_wave_spec(gaugenumber='waverider-26m', roundto=30)
 
             mock_wave.assert_called_once()
             call_kwargs = mock_wave.call_args[1]
