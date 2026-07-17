@@ -2748,52 +2748,115 @@ class getObs:
         return out
 
     # =========================================================================
-    # Deprecated method name mapping (for backward compatibility)
+    # Deprecated method aliases (for backward compatibility)
+    # These are explicit methods so they work with class-level introspection,
+    # mocking, and documentation tools.
     # =========================================================================
-    _DEPRECATED_METHODS = {
-        'getWaveData': 'get_wave_data',
-        'getWaveSpec': 'get_wave_spec',
-        'getWaveGaugeLoc': 'get_wave_gauge_loc',
-        'getCurrents': 'get_currents',
-        'getWind': 'get_wind',
-        'getWL': 'get_wl',
-        'getGaugeWL': 'get_gauge_wl',
-        'getBathyTransectFromNC': 'get_bathy_transect_from_nc',
-        'getBathyTransectProfNum': 'get_bathy_transect_prof_num',
-        'getBathyGridFromNC': 'get_bathy_grid_from_nc',
-        'getBathyDuckLoc': 'get_bathy_duck_loc',
-        'getBathyRegionalDEM': 'get_bathy_regional_dem',
-        'getBathyGridcBathy': 'get_bathy_grid_cbathy',
-        'getLidarRunup': 'get_lidar_runup',
-        'getLidarWaveProf': 'get_lidar_wave_prof',
-        'getLidarTopo': 'get_lidar_topo',
-        'getCTD': 'get_ctd',
-        'getALT': 'get_alt',
-        'getArgus': 'get_argus',
-        '_waveGaugeURLlookup': '_wave_gauge_url_lookup',
-        '_wlGageURLlookup': '_wl_gauge_url_lookup',
-    }
 
-    def __getattr__(self, name):
-        """Handle deprecated method names with warnings.
+    def getWaveData(self, *args, **kwargs):
+        """Deprecated: Use get_wave_data instead."""
+        warnings.warn("getWaveData is deprecated, use get_wave_data instead", DeprecationWarning, stacklevel=2)
+        return self.get_wave_data(*args, **kwargs)
 
-        Returns a wrapper that emits the warning when called (not on access),
-        so introspection like hasattr() doesn't trigger warnings.
-        """
-        if name in self._DEPRECATED_METHODS:
-            new_name = self._DEPRECATED_METHODS[name]
-            new_method = object.__getattribute__(self, new_name)
+    def getWaveSpec(self, *args, **kwargs):
+        """Deprecated: Use get_wave_spec instead."""
+        warnings.warn("getWaveSpec is deprecated, use get_wave_spec instead", DeprecationWarning, stacklevel=2)
+        return self.get_wave_spec(*args, **kwargs)
 
-            def _deprecated_method_wrapper(*args, **kwargs):
-                warnings.warn(
-                    f"{name} is deprecated, use {new_name} instead",
-                    DeprecationWarning,
-                    stacklevel=2
-                )
-                return new_method(*args, **kwargs)
+    def getWaveGaugeLoc(self, *args, **kwargs):
+        """Deprecated: Use get_wave_gauge_loc instead."""
+        warnings.warn("getWaveGaugeLoc is deprecated, use get_wave_gauge_loc instead", DeprecationWarning, stacklevel=2)
+        return self.get_wave_gauge_loc(*args, **kwargs)
 
-            return _deprecated_method_wrapper
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+    def getCurrents(self, *args, **kwargs):
+        """Deprecated: Use get_currents instead."""
+        warnings.warn("getCurrents is deprecated, use get_currents instead", DeprecationWarning, stacklevel=2)
+        return self.get_currents(*args, **kwargs)
+
+    def getWind(self, *args, **kwargs):
+        """Deprecated: Use get_wind instead."""
+        warnings.warn("getWind is deprecated, use get_wind instead", DeprecationWarning, stacklevel=2)
+        return self.get_wind(*args, **kwargs)
+
+    def getWL(self, *args, **kwargs):
+        """Deprecated: Use get_wl instead."""
+        warnings.warn("getWL is deprecated, use get_wl instead", DeprecationWarning, stacklevel=2)
+        return self.get_wl(*args, **kwargs)
+
+    def getGaugeWL(self, *args, **kwargs):
+        """Deprecated: Use get_gauge_wl instead."""
+        warnings.warn("getGaugeWL is deprecated, use get_gauge_wl instead", DeprecationWarning, stacklevel=2)
+        return self.get_gauge_wl(*args, **kwargs)
+
+    def getBathyTransectFromNC(self, *args, **kwargs):
+        """Deprecated: Use get_bathy_transect_from_nc instead."""
+        warnings.warn("getBathyTransectFromNC is deprecated, use get_bathy_transect_from_nc instead", DeprecationWarning, stacklevel=2)
+        return self.get_bathy_transect_from_nc(*args, **kwargs)
+
+    def getBathyTransectProfNum(self, *args, **kwargs):
+        """Deprecated: Use get_bathy_transect_prof_num instead."""
+        warnings.warn("getBathyTransectProfNum is deprecated, use get_bathy_transect_prof_num instead", DeprecationWarning, stacklevel=2)
+        return self.get_bathy_transect_prof_num(*args, **kwargs)
+
+    def getBathyGridFromNC(self, *args, **kwargs):
+        """Deprecated: Use get_bathy_grid_from_nc instead."""
+        warnings.warn("getBathyGridFromNC is deprecated, use get_bathy_grid_from_nc instead", DeprecationWarning, stacklevel=2)
+        return self.get_bathy_grid_from_nc(*args, **kwargs)
+
+    def getBathyDuckLoc(self, *args, **kwargs):
+        """Deprecated: Use get_bathy_duck_loc instead."""
+        warnings.warn("getBathyDuckLoc is deprecated, use get_bathy_duck_loc instead", DeprecationWarning, stacklevel=2)
+        return self.get_bathy_duck_loc(*args, **kwargs)
+
+    def getBathyRegionalDEM(self, *args, **kwargs):
+        """Deprecated: Use get_bathy_regional_dem instead."""
+        warnings.warn("getBathyRegionalDEM is deprecated, use get_bathy_regional_dem instead", DeprecationWarning, stacklevel=2)
+        return self.get_bathy_regional_dem(*args, **kwargs)
+
+    def getBathyGridcBathy(self, *args, **kwargs):
+        """Deprecated: Use get_bathy_grid_cbathy instead."""
+        warnings.warn("getBathyGridcBathy is deprecated, use get_bathy_grid_cbathy instead", DeprecationWarning, stacklevel=2)
+        return self.get_bathy_grid_cbathy(*args, **kwargs)
+
+    def getLidarRunup(self, *args, **kwargs):
+        """Deprecated: Use get_lidar_runup instead."""
+        warnings.warn("getLidarRunup is deprecated, use get_lidar_runup instead", DeprecationWarning, stacklevel=2)
+        return self.get_lidar_runup(*args, **kwargs)
+
+    def getLidarWaveProf(self, *args, **kwargs):
+        """Deprecated: Use get_lidar_wave_prof instead."""
+        warnings.warn("getLidarWaveProf is deprecated, use get_lidar_wave_prof instead", DeprecationWarning, stacklevel=2)
+        return self.get_lidar_wave_prof(*args, **kwargs)
+
+    def getLidarTopo(self, *args, **kwargs):
+        """Deprecated: Use get_lidar_topo instead."""
+        warnings.warn("getLidarTopo is deprecated, use get_lidar_topo instead", DeprecationWarning, stacklevel=2)
+        return self.get_lidar_topo(*args, **kwargs)
+
+    def getCTD(self, *args, **kwargs):
+        """Deprecated: Use get_ctd instead."""
+        warnings.warn("getCTD is deprecated, use get_ctd instead", DeprecationWarning, stacklevel=2)
+        return self.get_ctd(*args, **kwargs)
+
+    def getALT(self, *args, **kwargs):
+        """Deprecated: Use get_alt instead."""
+        warnings.warn("getALT is deprecated, use get_alt instead", DeprecationWarning, stacklevel=2)
+        return self.get_alt(*args, **kwargs)
+
+    def getArgus(self, *args, **kwargs):
+        """Deprecated: Use get_argus instead."""
+        warnings.warn("getArgus is deprecated, use get_argus instead", DeprecationWarning, stacklevel=2)
+        return self.get_argus(*args, **kwargs)
+
+    def _waveGaugeURLlookup(self, *args, **kwargs):
+        """Deprecated: Use _wave_gauge_url_lookup instead."""
+        warnings.warn("_waveGaugeURLlookup is deprecated, use _wave_gauge_url_lookup instead", DeprecationWarning, stacklevel=2)
+        return self._wave_gauge_url_lookup(*args, **kwargs)
+
+    def _wlGageURLlookup(self, *args, **kwargs):
+        """Deprecated: Use _wl_gauge_url_lookup instead."""
+        warnings.warn("_wlGageURLlookup is deprecated, use _wl_gauge_url_lookup instead", DeprecationWarning, stacklevel=2)
+        return self._wl_gauge_url_lookup(*args, **kwargs)
 
 
 class getDataTestBed:
