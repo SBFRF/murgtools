@@ -1195,7 +1195,7 @@ class TestNewGaugeURLLookups:
 class TestGetArgusPixelIntensity:
     """Tests for the getArgusPixelIntensity function."""
 
-    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.getdata.getDataFRF.get_argus_imagery')
     def test_single_time_pixel_coords(self, mock_get_imagery):
         """Test extraction with single time and pixel coordinates."""
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
@@ -1226,7 +1226,7 @@ class TestGetArgusPixelIntensity:
         assert result['location']['pixel_i'] == 150
         assert result['location']['pixel_j'] == 200
 
-    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.getdata.getDataFRF.get_argus_imagery')
     def test_multiple_times(self, mock_get_imagery):
         """Test extraction over multiple times."""
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
@@ -1263,7 +1263,7 @@ class TestGetArgusPixelIntensity:
         assert len(result['intensity']) == 3
         assert len(result['missing_times']) == 0
 
-    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.getdata.getDataFRF.get_argus_imagery')
     def test_missing_times_handling(self, mock_get_imagery):
         """Test that missing times are properly tracked."""
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
@@ -1307,7 +1307,7 @@ class TestGetArgusPixelIntensity:
         assert len(result['missing_times']) == 1
         assert result['missing_times'][0] == times[1]
 
-    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.getdata.getDataFRF.get_argus_imagery')
     def test_channel_extraction(self, mock_get_imagery):
         """Test extraction of specific color channels."""
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
@@ -1353,7 +1353,7 @@ class TestGetArgusPixelIntensity:
         )
         assert result['intensity'][0] == 64
 
-    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.getdata.getDataFRF.get_argus_imagery')
     def test_grayscale_conversion(self, mock_get_imagery):
         """Test grayscale conversion."""
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
@@ -1381,7 +1381,7 @@ class TestGetArgusPixelIntensity:
         expected = 0.299 * 255 + 0.587 * 128 + 0.114 * 64
         assert np.isclose(result['intensity'][0], expected)
 
-    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.getdata.getDataFRF.get_argus_imagery')
     def test_out_of_bounds_pixel(self, mock_get_imagery):
         """Test handling of out-of-bounds pixel coordinates.
 
@@ -1412,7 +1412,7 @@ class TestGetArgusPixelIntensity:
         assert result is None
 
     @patch('requests.get')
-    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.getdata.getDataFRF.get_argus_imagery')
     @patch('murgtools.utils.geoprocess.FRF2ncsp')
     def test_frf_coordinates(self, mock_frf2ncsp, mock_get_imagery, mock_requests_get):
         """Test extraction using FRF coordinates.
@@ -1510,7 +1510,7 @@ class TestGetArgusPixelIntensity:
         """Test that invalid channel raises error."""
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
 
-        with patch('murgtools.getdata.getDataFRF.getArgusImagery') as mock_get_imagery:
+        with patch('murgtools.getdata.getDataFRF.get_argus_imagery') as mock_get_imagery:
             mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
             
             mock_get_imagery.return_value = {
@@ -1534,7 +1534,7 @@ class TestGetArgusPixelIntensity:
         """Test location specification as dictionary."""
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
 
-        with patch('murgtools.getdata.getDataFRF.getArgusImagery') as mock_get_imagery:
+        with patch('murgtools.getdata.getDataFRF.get_argus_imagery') as mock_get_imagery:
             mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
             mock_image[200, 150, :] = [255, 128, 64]
             
