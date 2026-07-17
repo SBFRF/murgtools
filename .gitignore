@@ -111,6 +111,10 @@ Thumbs.db
 *.nc
 *.pickle
 *.pkl
+*.tif
+Argus_*.tif
+*_diagnostic.png
+*_test.png
 
 # Local development configs
 .claude/
