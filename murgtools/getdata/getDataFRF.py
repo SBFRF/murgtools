@@ -616,8 +616,8 @@ class getObs:
         TODO: Set optional date input from function arguments to change self.start self.end
 
         Args:
-          gaugenumber: wave gauge numbers pulled from self.waveGaugeURLlookup
-               see help on self.waveGaugeURLlookup for possible gauge names (Default value = 0)
+          gaugenumber: wave gauge numbers pulled from self._wave_gauge_url_lookup
+               see help on self._wave_gauge_url_lookup for possible gauge names (Default value = 0)
           roundto: this is duration in minutes which data are expected.  times are rounded to nearest
              30 minute increment (data on server are not even times) (Default value = 30)
           removeBadDataFlag (int): this will remove data with a directional flag of 3/4 signaling questionable or
@@ -675,7 +675,7 @@ class getObs:
         return self._get_with_cache('wave', fetch_data, cache_params, force_refresh)
 
     def _getWaveData_impl(self, gaugenumber, roundto, removeBadDataFlag, returnAB, spec):
-        """Internal implementation of getWaveData (without caching)."""
+        """Internal implementation of get_wave_data (without caching)."""
         # Making gauges flexible
         self._wave_gauge_url_lookup(gaugenumber)
         # parsing out data of interest in time
@@ -3928,7 +3928,7 @@ def thread_get_argus_imagery(dateOfInterest, filename=None, imageType="timex", v
 
     Example:
         >>> import datetime as DT
-        >>> filename = threadGetArgusImagery(DT.datetime(2024, 6, 15, 12, 0, 0))
+        >>> filename = thread_get_argus_imagery(DT.datetime(2024, 6, 15, 12, 0, 0))
         >>> print(f"Downloading to: {filename}")
 
     """
@@ -3972,7 +3972,7 @@ def find_argus_imagery(dateOfInterest, filename=None, imageType="timex", verbose
             Defaults to 0.
 
     Returns:
-        dict: Same as getArgusImagery, plus:
+        dict: Same as get_argus_imagery, plus:
             - 'time_requested': original requested datetime (rounded to 30-min)
             - 'time_offset_minutes': offset from requested time (negative=earlier)
         Returns None if no image found within search window.
@@ -3980,11 +3980,11 @@ def find_argus_imagery(dateOfInterest, filename=None, imageType="timex", verbose
     Example:
         >>> import datetime as DT
         >>> # Find nearest available image to now
-        >>> result = findArgusImagery(DT.datetime.now(), method=0)
+        >>> result = find_argus_imagery(DT.datetime.now(), method=0)
         >>> if result:
         ...     print(f"Found image {result['time_offset_minutes']} min from requested")
         >>> # Find most recent image before target (for operational use)
-        >>> result = findArgusImagery(DT.datetime.now(), method=1)
+        >>> result = find_argus_imagery(DT.datetime.now(), method=1)
 
     """
     if verbose:

@@ -93,8 +93,8 @@ def wave_PlotData(name, mod_time, time, THREDDS='FRF'):
     try:
 
         dict = {}
-        wave_data = frf_Data.getWaveSpec(gaugenumber=name)
-        cur_data = frf_Data.getCurrents(name)
+        wave_data = frf_Data.get_wave_spec(gaugenumber=name)
+        cur_data = frf_Data.get_currents(name)
 
         dict['name'] = name
         dict['wave_time'] = wave_data['time']
@@ -203,7 +203,7 @@ def CMSF_velData(cmsfDict, station, dThresh=None):
     go = getObs(modTime[0] - DT.timedelta(minutes=3), modTime[-1] + DT.timedelta(minutes=3))
 
     # get my obs_dict
-    obsV = go.getCurrents(station)
+    obsV = go.get_currents(station)
     if obsV is None:
         out = None
     elif 'aveU' not in obsV:
