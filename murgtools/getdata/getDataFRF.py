@@ -2784,22 +2784,6 @@ class getObs:
             new_name = self._DEPRECATED_METHODS[name]
             new_method = object.__getattribute__(self, new_name)
 
-            # Special case: getWaveSpec is double-deprecated (name AND functionality)
-            # Skip intermediate get_wave_spec and go directly to get_wave_data
-            if name == 'getWaveSpec':
-                get_wave_data = object.__getattribute__(self, 'get_wave_data')
-
-                def _getWaveSpec_wrapper(*args, **kwargs):
-                    warnings.warn(
-                        "getWaveSpec is deprecated, use get_wave_data(..., spec=True) instead",
-                        DeprecationWarning,
-                        stacklevel=2
-                    )
-                    kwargs['spec'] = True
-                    return get_wave_data(*args, **kwargs)
-
-                return _getWaveSpec_wrapper
-
             def _deprecated_method_wrapper(*args, **kwargs):
                 warnings.warn(
                     f"{name} is deprecated, use {new_name} instead",
