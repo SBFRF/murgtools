@@ -154,7 +154,7 @@ def conditions_plot(time_list, start_date, end_date, gauge='waverider-17m',
 
     # Get wave data for the entire period
     gd = getObs(start_date, end_date, server=server)
-    all_data = gd.getWaveData(gauge, spec=False)
+    all_data = gd.get_wave_data(gauge, spec=False)
 
     # Validate that we have data
     if len(all_data['time']) == 0:

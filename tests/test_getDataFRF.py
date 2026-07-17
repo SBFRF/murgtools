@@ -1004,11 +1004,11 @@ class TestGetObsGetCurrents:
 
 
 class TestGetObsGetWaveSpec:
-    """Tests for the getObs.getWaveSpec method."""
+    """Tests for the getObs.get_wave_spec method and deprecated getWaveSpec alias."""
 
     @patch('murgtools.getdata.getDataFRF.nc.date2num')
     def test_getWaveSpec_emits_deprecation_warning(self, mock_date2num):
-        """Test that getWaveSpec emits a deprecation warning."""
+        """Test that deprecated getWaveSpec emits a warning pointing to get_wave_spec."""
         mock_date2num.return_value = 1577836800.0
         d1 = DT.datetime(2020, 1, 1)
         d2 = DT.datetime(2020, 1, 2)
@@ -1016,13 +1016,13 @@ class TestGetObsGetWaveSpec:
         from murgtools.getdata.getDataFRF import getObs
         obs = getObs(d1, d2)
 
-        with pytest.warns(UserWarning, match="getWaveSpec is depreciated"):
-            with patch.object(obs, 'getWaveData', return_value={'test': 'data'}):
+        with pytest.warns(DeprecationWarning, match="getWaveSpec is deprecated.*get_wave_spec"):
+            with patch.object(obs, 'get_wave_spec', return_value={'test': 'data'}):
                 obs.getWaveSpec()
 
     @patch('murgtools.getdata.getDataFRF.nc.date2num')
-    def test_getWaveSpec_calls_getWaveData_with_spec_true(self, mock_date2num):
-        """Test that getWaveSpec calls getWaveData with spec=True."""
+    def test_get_wave_spec_no_warning(self, mock_date2num):
+        """Test that get_wave_spec (new snake_case API) does not emit warnings."""
         mock_date2num.return_value = 1577836800.0
         d1 = DT.datetime(2020, 1, 1)
         d2 = DT.datetime(2020, 1, 2)
@@ -1030,11 +1030,27 @@ class TestGetObsGetWaveSpec:
         from murgtools.getdata.getDataFRF import getObs
         obs = getObs(d1, d2)
 
-        with patch.object(obs, 'getWaveData', return_value={'test': 'data'}) as mock_wave:
+        with patch.object(obs, 'get_wave_data', return_value={'test': 'data'}):
             import warnings
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                result = obs.getWaveSpec(gaugenumber='waverider-26m', roundto=30)
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                obs.get_wave_spec(gaugenumber='waverider-26m', roundto=30)
+                # Filter for DeprecationWarnings only
+                deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+                assert len(deprecation_warnings) == 0, "get_wave_spec should not emit DeprecationWarning"
+
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
+    def test_get_wave_spec_calls_get_wave_data_with_spec_true(self, mock_date2num):
+        """Test that get_wave_spec calls get_wave_data with spec=True."""
+        mock_date2num.return_value = 1577836800.0
+        d1 = DT.datetime(2020, 1, 1)
+        d2 = DT.datetime(2020, 1, 2)
+
+        from murgtools.getdata.getDataFRF import getObs
+        obs = getObs(d1, d2)
+
+        with patch.object(obs, 'get_wave_data', return_value={'test': 'data'}) as mock_wave:
+            obs.get_wave_spec(gaugenumber='waverider-26m', roundto=30)
 
             mock_wave.assert_called_once()
             call_kwargs = mock_wave.call_args[1]
@@ -1195,7 +1211,7 @@ class TestNewGaugeURLLookups:
 class TestGetArgusPixelIntensity:
     """Tests for the getArgusPixelIntensity function."""
 
-    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.getdata.getDataFRF.get_argus_imagery')
     def test_single_time_pixel_coords(self, mock_get_imagery):
         """Test extraction with single time and pixel coordinates."""
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
@@ -1226,7 +1242,7 @@ class TestGetArgusPixelIntensity:
         assert result['location']['pixel_i'] == 150
         assert result['location']['pixel_j'] == 200
 
-    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.getdata.getDataFRF.get_argus_imagery')
     def test_multiple_times(self, mock_get_imagery):
         """Test extraction over multiple times."""
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
@@ -1263,7 +1279,7 @@ class TestGetArgusPixelIntensity:
         assert len(result['intensity']) == 3
         assert len(result['missing_times']) == 0
 
-    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.getdata.getDataFRF.get_argus_imagery')
     def test_missing_times_handling(self, mock_get_imagery):
         """Test that missing times are properly tracked."""
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
@@ -1307,7 +1323,7 @@ class TestGetArgusPixelIntensity:
         assert len(result['missing_times']) == 1
         assert result['missing_times'][0] == times[1]
 
-    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.getdata.getDataFRF.get_argus_imagery')
     def test_channel_extraction(self, mock_get_imagery):
         """Test extraction of specific color channels."""
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
@@ -1353,7 +1369,7 @@ class TestGetArgusPixelIntensity:
         )
         assert result['intensity'][0] == 64
 
-    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.getdata.getDataFRF.get_argus_imagery')
     def test_grayscale_conversion(self, mock_get_imagery):
         """Test grayscale conversion."""
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
@@ -1381,7 +1397,7 @@ class TestGetArgusPixelIntensity:
         expected = 0.299 * 255 + 0.587 * 128 + 0.114 * 64
         assert np.isclose(result['intensity'][0], expected)
 
-    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.getdata.getDataFRF.get_argus_imagery')
     def test_out_of_bounds_pixel(self, mock_get_imagery):
         """Test handling of out-of-bounds pixel coordinates.
 
@@ -1412,7 +1428,7 @@ class TestGetArgusPixelIntensity:
         assert result is None
 
     @patch('requests.get')
-    @patch('murgtools.getdata.getDataFRF.getArgusImagery')
+    @patch('murgtools.getdata.getDataFRF.get_argus_imagery')
     @patch('murgtools.utils.geoprocess.FRF2ncsp')
     def test_frf_coordinates(self, mock_frf2ncsp, mock_get_imagery, mock_requests_get):
         """Test extraction using FRF coordinates.
@@ -1510,7 +1526,7 @@ class TestGetArgusPixelIntensity:
         """Test that invalid channel raises error."""
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
 
-        with patch('murgtools.getdata.getDataFRF.getArgusImagery') as mock_get_imagery:
+        with patch('murgtools.getdata.getDataFRF.get_argus_imagery') as mock_get_imagery:
             mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
             
             mock_get_imagery.return_value = {
@@ -1534,7 +1550,7 @@ class TestGetArgusPixelIntensity:
         """Test location specification as dictionary."""
         from murgtools.getdata.getDataFRF import getArgusPixelIntensity
 
-        with patch('murgtools.getdata.getDataFRF.getArgusImagery') as mock_get_imagery:
+        with patch('murgtools.getdata.getDataFRF.get_argus_imagery') as mock_get_imagery:
             mock_image = np.ones((1000, 1500, 3), dtype=np.uint8) * 100
             mock_image[200, 150, :] = [255, 128, 64]
             

@@ -431,7 +431,7 @@ def getnc(dataLoc, callingClass, epoch1=0, epoch2=0, dtRound=None, cutrange=1000
     else:
         return ncFile, sb.baseRound(allEpoch, base=dtRound), indexRef # round to nearest minute
 
-def removeDuplicatesFromDictionary(inputDict):
+def remove_duplicates_from_dictionary(inputDict):
     """This function checks through the data and will remove duplicates from key 'epochtime's.
 
     A place holder to check, and remove duplicate times from this whole class. It needs to be though through still,
@@ -483,6 +483,13 @@ def removeDuplicatesFromDictionary(inputDict):
             #                    every other duplicate record
             # inputDict = sb.reduceDict(inputDict, idxObs)
     return inputDict
+
+
+# Deprecated alias for backward compatibility
+def removeDuplicatesFromDictionary(inputDict):
+    """Deprecated: Use remove_duplicates_from_dictionary instead."""
+    warnings.warn("removeDuplicatesFromDictionary is deprecated, use remove_duplicates_from_dictionary instead", DeprecationWarning, stacklevel=2)
+    return remove_duplicates_from_dictionary(inputDict)
 
 
 class getObs:
@@ -603,14 +610,14 @@ class getObs:
             force_refresh=force_refresh or self._force_refresh,
         )
 
-    def getWaveData(self, gaugenumber=0, roundto=30, removeBadDataFlag=4, force_refresh=False, **kwargs):
+    def get_wave_data(self, gaugenumber=0, roundto=30, removeBadDataFlag=4, force_refresh=False, **kwargs):
         """This function pulls down the data from the thredds server and puts the data into a dictionary.
 
         TODO: Set optional date input from function arguments to change self.start self.end
 
         Args:
-          gaugenumber: wave gauge numbers pulled from self.waveGaugeURLlookup
-               see help on self.waveGaugeURLlookup for possible gauge names (Default value = 0)
+          gaugenumber: wave gauge numbers pulled from self._wave_gauge_url_lookup
+               see help on self._wave_gauge_url_lookup for possible gauge names (Default value = 0)
           roundto: this is duration in minutes which data are expected.  times are rounded to nearest
              30 minute increment (data on server are not even times) (Default value = 30)
           removeBadDataFlag (int): this will remove data with a directional flag of 3/4 signaling questionable or
@@ -668,9 +675,9 @@ class getObs:
         return self._get_with_cache('wave', fetch_data, cache_params, force_refresh)
 
     def _getWaveData_impl(self, gaugenumber, roundto, removeBadDataFlag, returnAB, spec):
-        """Internal implementation of getWaveData (without caching)."""
+        """Internal implementation of get_wave_data (without caching)."""
         # Making gauges flexible
-        self._waveGaugeURLlookup(gaugenumber)
+        self._wave_gauge_url_lookup(gaugenumber)
         # parsing out data of interest in time
         self.ncfile, self.allEpoch, indexRef = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
                                            dtRound=roundto * 60, epoch1=self.epochd1, epoch2=self.epochd2,
@@ -805,7 +812,7 @@ class getObs:
                             wavespec = sb.reduceDict(wavespec, idx)
                     except(KeyError):
                         pass  # non -directional gauge
-                wavespec = removeDuplicatesFromDictionary(wavespec)
+                wavespec = remove_duplicates_from_dictionary(wavespec)
 
                 return wavespec
 
@@ -824,18 +831,15 @@ class getObs:
                             'lon':  self.ncfile['lon'][:],
                             'name': str(self.ncfile.title), }"""
 
-    def getWaveSpec(self, gaugenumber=0, roundto=30, removeBadDataFlag=4, **kwargs):
-        warnings.warn("WARNING: getWaveSpec is depreciated, update to use getWaveData, spec=True")
-        returnAB = kwargs.get('returnAB', False)
-        specOnly = kwargs.get('specOnly', False)
-        # if specOnly:
-        #     wavedata = self.getWaveData(gaugenumber, roundto, removeBadDataFlag, returnAB=returnAB, spec=True)
-        #     # work around
-        #     return wavedata
-        # else:
-        return self.getWaveData(gaugenumber, roundto, removeBadDataFlag, returnAB=returnAB, spec=True)
+    def get_wave_spec(self, gaugenumber=0, roundto=30, removeBadDataFlag=4, **kwargs):
+        """Convenience wrapper for get_wave_data with spec=True.
 
-    def getCurrents(self, gaugenumber=5, roundto=1, force_refresh=False):
+        Note: Consider using get_wave_data(..., spec=True) directly for clarity.
+        """
+        returnAB = kwargs.get('returnAB', False)
+        return self.get_wave_data(gaugenumber, roundto, removeBadDataFlag, returnAB=returnAB, spec=True)
+
+    def get_currents(self, gaugenumber=5, roundto=1, force_refresh=False):
         """This function pulls down the currents data from the Thredds Server.
 
         Args:
@@ -983,7 +987,7 @@ class getObs:
             self.curpacket = None
             return self.curpacket
 
-    def getWind(self, gaugenumber=0, collectionlength=10, force_refresh=False):
+    def get_wind(self, gaugenumber=0, collectionlength=10, force_refresh=False):
         """This function retrieves the wind data.
 
         Collection length is the time over which the wind record exists ie data is collected in 10 minute increments
@@ -1136,7 +1140,7 @@ class getObs:
             print('     ---- ERROR: Problem finding wind !!!')
             return None
 
-    def getWL(self, collectionlength=6, force_refresh=False):
+    def get_wl(self, collectionlength=6, force_refresh=False):
         """This function retrieves the water level data from the server.
 
         WL data on server is NAVD88
@@ -1208,7 +1212,7 @@ class getObs:
             self.WLpacket = None
         return self.WLpacket
 
-    def getGaugeWL(self, gaugenumber=5, roundto=1, force_refresh=False):
+    def get_gauge_wl(self, gaugenumber=5, roundto=1, force_refresh=False):
         """This function pulls down the water level data at a particular gauge from the Server.
 
         Args:
@@ -1247,7 +1251,7 @@ class getObs:
     def _getGaugeWL_impl(self, gaugenumber, roundto):
         """Internal implementation of getGaugeWL (without caching)."""
         # Making gauges flexible
-        self._wlGageURLlookup(gaugenumber)
+        self._wl_gauge_url_lookup(gaugenumber)
         # parsing out data of interest in time
         
         self.ncfile, self.allEpoch, _ = getnc(dataLoc=self.dataloc, callingClass=self.callingClass,
@@ -1299,7 +1303,7 @@ class getObs:
                             'name': str(self.ncfile.title), }
             return wlpacket
 
-    def getBathyTransectFromNC(self, profilenumbers=None, method=1, forceReturnAll=False, force_refresh=False):
+    def get_bathy_transect_from_nc(self, profilenumbers=None, method=1, forceReturnAll=False, force_refresh=False):
         """This function gets the bathymetric data from the server.
 
         Args:
@@ -1462,7 +1466,7 @@ class getObs:
 
         return profileDict
 
-    def getBathyTransectProfNum(self, method=1):
+    def get_bathy_transect_prof_num(self, method=1):
         """This function gets the bathymetric data from the server, currently designed for the bathy duck experiment.
 
         Just gets profile numbers only.
@@ -1535,7 +1539,7 @@ class getObs:
 
         return prof_nums
 
-    def getBathyGridFromNC(self, method, removeMask=True):
+    def get_bathy_grid_from_nc(self, method, removeMask=True):
         """This function gets the frf krigged grid product, it will currently break with the present link.
 
         Bathymetric data from the server.
@@ -1647,7 +1651,7 @@ class getObs:
                     }
         return gridDict
 
-    def _waveGaugeURLlookup(self, gaugenumber):
+    def _wave_gauge_url_lookup(self, gaugenumber):
         """A lookup table function that sets the URL backend for get wave spec and get wave gauge locations.
 
         Uses O(1) dictionary lookup via module-level _WAVE_GAUGE_URLS table.
@@ -1697,7 +1701,7 @@ class getObs:
             self.gname = 'There Are no Gauge numbers here'
             raise InvalidGaugeError(gaugenumber, message='Bad gauge name. See getWaveGaugeLoc for valid options.')
 
-    def _wlGageURLlookup(self, gaugenumber):
+    def _wl_gauge_url_lookup(self, gaugenumber):
         """A lookup table function that sets the URL backend for getGageWL.
 
         Uses O(1) dictionary lookup via module-level _WL_GAUGE_CONFIG table.
@@ -1735,7 +1739,7 @@ class getObs:
             self.gname = 'There Are no Gauge numbers here'
             raise InvalidGaugeError(gaugenumber, message='Bad gauge name. See _wlGageURLlookup for valid options.')
 
-    def getBathyDuckLoc(self, gaugenumber):
+    def get_bathy_duck_loc(self, gaugenumber):
         """This function pulls the stateplane location (if desired) from the survey.
 
         FRF coords from deployed ADV's, These are data owned by WHOI and kept on private local server
@@ -1779,7 +1783,7 @@ class getObs:
 
         return locDict
 
-    def getWaveGaugeLoc(self, gaugenumber):
+    def get_wave_gauge_loc(self, gaugenumber):
         """This function gets gauge location data quickly, faster than getwavespec.
 
         Args:
@@ -1794,7 +1798,7 @@ class getObs:
         Notes:
             see help on self.waveGaugeURLlookup for gauge keys
         """
-        self._waveGaugeURLlookup(gaugenumber)
+        self._wave_gauge_url_lookup(gaugenumber)
         ncfile = open_dataset_with_fallback(
             self.FRFdataloc + self.dataloc,
             self.chlDataLoc + self.dataloc,
@@ -1932,7 +1936,7 @@ class getObs:
 
         return sensor_locations
 
-    def getLidarRunup(self, removeMasked=True, force_refresh=False):
+    def get_lidar_runup(self, removeMasked=True, force_refresh=False):
         """This function will get the wave runup measurements from the lidar mounted in the dune.
 
         Args:
@@ -2041,7 +2045,7 @@ class getObs:
             out = None
         return out
 
-    def getCTD(self, force_refresh=False):
+    def get_ctd(self, force_refresh=False):
         """THIS FUNCTION IS CURRENTLY BROKEN.
 
         THE PROBLEM IS THAT self.cshore_ncfile does not have any keys?
@@ -2124,7 +2128,7 @@ class getObs:
 
         return ctd_Dict
 
-    def getALT(self, gaugeName=None, removeMasked=True, force_refresh=False):
+    def get_alt(self, gaugeName=None, removeMasked=True, force_refresh=False):
         """This function gets the Altimeter data from the thredds server.
 
         Args:
@@ -2272,7 +2276,7 @@ class getObs:
             self.altpacket = None
             return self.altpacket
 
-    def getLidarWaveProf(self, removeMasked=True):
+    def get_lidar_wave_prof(self, removeMasked=True):
         """Grabs wave profile data from Lidar gauge.
 
         Args:
@@ -2383,7 +2387,7 @@ class getObs:
             out = None
         return out
 
-    def getLidarTopo(self, **kwargs):
+    def get_lidar_topo(self, **kwargs):
         """This function will get the lidar DEM data, beach topography data.
 
         Args: None
@@ -2475,7 +2479,7 @@ class getObs:
 
         return DEMdata
 
-    def getBathyRegionalDEM(self, utmEmin, utmEmax, utmNmin, utmNmax):
+    def get_bathy_regional_dem(self, utmEmin, utmEmax, utmNmin, utmNmax):
         """Grabs bathymery from the regional background grid.
 
         Args:
@@ -2525,7 +2529,7 @@ class getObs:
 
         return out
 
-    def getBathyGridcBathy(self, **kwargs):
+    def get_bathy_grid_cbathy(self, **kwargs):
         """This function gets the cbathy data from the below address, assumes fill value of -999.
 
         Keyword Args:
@@ -2654,7 +2658,7 @@ class getObs:
 
         return cbdata
 
-    def getArgus(self, type, **kwargs):
+    def get_argus(self, type, **kwargs):
         """Grabs argus data from the bathyDuck time period, particularly staple products.
 
         Currently this is only retrieves variance and timex images.
@@ -2742,6 +2746,117 @@ class getObs:
         except(IndexError, AssertionError):
             out = None
         return out
+
+    # =========================================================================
+    # Deprecated method aliases (for backward compatibility)
+    # These are explicit methods so they work with class-level introspection,
+    # mocking, and documentation tools.
+    # =========================================================================
+
+    def getWaveData(self, *args, **kwargs):
+        """Deprecated: Use get_wave_data instead."""
+        warnings.warn("getWaveData is deprecated, use get_wave_data instead", DeprecationWarning, stacklevel=2)
+        return self.get_wave_data(*args, **kwargs)
+
+    def getWaveSpec(self, *args, **kwargs):
+        """Deprecated: Use get_wave_spec instead."""
+        warnings.warn("getWaveSpec is deprecated, use get_wave_spec instead", DeprecationWarning, stacklevel=2)
+        return self.get_wave_spec(*args, **kwargs)
+
+    def getWaveGaugeLoc(self, *args, **kwargs):
+        """Deprecated: Use get_wave_gauge_loc instead."""
+        warnings.warn("getWaveGaugeLoc is deprecated, use get_wave_gauge_loc instead", DeprecationWarning, stacklevel=2)
+        return self.get_wave_gauge_loc(*args, **kwargs)
+
+    def getCurrents(self, *args, **kwargs):
+        """Deprecated: Use get_currents instead."""
+        warnings.warn("getCurrents is deprecated, use get_currents instead", DeprecationWarning, stacklevel=2)
+        return self.get_currents(*args, **kwargs)
+
+    def getWind(self, *args, **kwargs):
+        """Deprecated: Use get_wind instead."""
+        warnings.warn("getWind is deprecated, use get_wind instead", DeprecationWarning, stacklevel=2)
+        return self.get_wind(*args, **kwargs)
+
+    def getWL(self, *args, **kwargs):
+        """Deprecated: Use get_wl instead."""
+        warnings.warn("getWL is deprecated, use get_wl instead", DeprecationWarning, stacklevel=2)
+        return self.get_wl(*args, **kwargs)
+
+    def getGaugeWL(self, *args, **kwargs):
+        """Deprecated: Use get_gauge_wl instead."""
+        warnings.warn("getGaugeWL is deprecated, use get_gauge_wl instead", DeprecationWarning, stacklevel=2)
+        return self.get_gauge_wl(*args, **kwargs)
+
+    def getBathyTransectFromNC(self, *args, **kwargs):
+        """Deprecated: Use get_bathy_transect_from_nc instead."""
+        warnings.warn("getBathyTransectFromNC is deprecated, use get_bathy_transect_from_nc instead", DeprecationWarning, stacklevel=2)
+        return self.get_bathy_transect_from_nc(*args, **kwargs)
+
+    def getBathyTransectProfNum(self, *args, **kwargs):
+        """Deprecated: Use get_bathy_transect_prof_num instead."""
+        warnings.warn("getBathyTransectProfNum is deprecated, use get_bathy_transect_prof_num instead", DeprecationWarning, stacklevel=2)
+        return self.get_bathy_transect_prof_num(*args, **kwargs)
+
+    def getBathyGridFromNC(self, *args, **kwargs):
+        """Deprecated: Use get_bathy_grid_from_nc instead."""
+        warnings.warn("getBathyGridFromNC is deprecated, use get_bathy_grid_from_nc instead", DeprecationWarning, stacklevel=2)
+        return self.get_bathy_grid_from_nc(*args, **kwargs)
+
+    def getBathyDuckLoc(self, *args, **kwargs):
+        """Deprecated: Use get_bathy_duck_loc instead."""
+        warnings.warn("getBathyDuckLoc is deprecated, use get_bathy_duck_loc instead", DeprecationWarning, stacklevel=2)
+        return self.get_bathy_duck_loc(*args, **kwargs)
+
+    def getBathyRegionalDEM(self, *args, **kwargs):
+        """Deprecated: Use get_bathy_regional_dem instead."""
+        warnings.warn("getBathyRegionalDEM is deprecated, use get_bathy_regional_dem instead", DeprecationWarning, stacklevel=2)
+        return self.get_bathy_regional_dem(*args, **kwargs)
+
+    def getBathyGridcBathy(self, *args, **kwargs):
+        """Deprecated: Use get_bathy_grid_cbathy instead."""
+        warnings.warn("getBathyGridcBathy is deprecated, use get_bathy_grid_cbathy instead", DeprecationWarning, stacklevel=2)
+        return self.get_bathy_grid_cbathy(*args, **kwargs)
+
+    def getLidarRunup(self, *args, **kwargs):
+        """Deprecated: Use get_lidar_runup instead."""
+        warnings.warn("getLidarRunup is deprecated, use get_lidar_runup instead", DeprecationWarning, stacklevel=2)
+        return self.get_lidar_runup(*args, **kwargs)
+
+    def getLidarWaveProf(self, *args, **kwargs):
+        """Deprecated: Use get_lidar_wave_prof instead."""
+        warnings.warn("getLidarWaveProf is deprecated, use get_lidar_wave_prof instead", DeprecationWarning, stacklevel=2)
+        return self.get_lidar_wave_prof(*args, **kwargs)
+
+    def getLidarTopo(self, *args, **kwargs):
+        """Deprecated: Use get_lidar_topo instead."""
+        warnings.warn("getLidarTopo is deprecated, use get_lidar_topo instead", DeprecationWarning, stacklevel=2)
+        return self.get_lidar_topo(*args, **kwargs)
+
+    def getCTD(self, *args, **kwargs):
+        """Deprecated: Use get_ctd instead."""
+        warnings.warn("getCTD is deprecated, use get_ctd instead", DeprecationWarning, stacklevel=2)
+        return self.get_ctd(*args, **kwargs)
+
+    def getALT(self, *args, **kwargs):
+        """Deprecated: Use get_alt instead."""
+        warnings.warn("getALT is deprecated, use get_alt instead", DeprecationWarning, stacklevel=2)
+        return self.get_alt(*args, **kwargs)
+
+    def getArgus(self, *args, **kwargs):
+        """Deprecated: Use get_argus instead."""
+        warnings.warn("getArgus is deprecated, use get_argus instead", DeprecationWarning, stacklevel=2)
+        return self.get_argus(*args, **kwargs)
+
+    def _waveGaugeURLlookup(self, *args, **kwargs):
+        """Deprecated: Use _wave_gauge_url_lookup instead."""
+        warnings.warn("_waveGaugeURLlookup is deprecated, use _wave_gauge_url_lookup instead", DeprecationWarning, stacklevel=2)
+        return self._wave_gauge_url_lookup(*args, **kwargs)
+
+    def _wlGageURLlookup(self, *args, **kwargs):
+        """Deprecated: Use _wl_gauge_url_lookup instead."""
+        warnings.warn("_wlGageURLlookup is deprecated, use _wl_gauge_url_lookup instead", DeprecationWarning, stacklevel=2)
+        return self._wl_gauge_url_lookup(*args, **kwargs)
 
 
 class getDataTestBed:
@@ -3393,7 +3508,7 @@ class getDataTestBed:
 
         assert field[var].shape[0] == len(
             field['time']), " the indexing is wrong for pulling down the spatial output"
-        field = removeDuplicatesFromDictionary(field)
+        field = remove_duplicates_from_dictionary(field)
         return field
 
     def getWaveSpecSTWAVE(self, prefix, gaugenumber, local=True, model='STWAVE'):
@@ -3569,7 +3684,7 @@ class getDataTestBed:
             if removeBadWLFlag is not False:
                 idxGood = np.argwhere(qcFlags[:, 2] <= 5).squeeze()
                 wavespec = sb.reduceDict(wavespec, idxGood)
-            return removeDuplicatesFromDictionary(wavespec)
+            return remove_duplicates_from_dictionary(wavespec)
 
         except (RuntimeError, AssertionError) as err:
             print(err)
@@ -3743,7 +3858,7 @@ def get_geotiff_extent(filepath, to_latlon=False):
         return [min(lons), max(lons), min(lats), max(lats)]
 
 
-def getArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=True):
+def get_argus_imagery(dateOfInterest, filename=None, imageType="timex", verbose=True):
     """Retrieve Argus orthophoto imagery from the FRF coastal imaging server.
 
     Argus images are available every 30 minutes from the FRF tower. This function
@@ -3771,7 +3886,7 @@ def getArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=Tr
 
     Example:
         >>> import datetime as DT
-        >>> result = getArgusImagery(DT.datetime(2024, 6, 15, 12, 0, 0))
+        >>> result = get_argus_imagery(DT.datetime(2024, 6, 15, 12, 0, 0))
         >>> if result:
         ...     print(result['time'], result['image'].shape)
 
@@ -3840,7 +3955,7 @@ def getArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=Tr
     }
 
 
-def threadGetArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=True):
+def thread_get_argus_imagery(dateOfInterest, filename=None, imageType="timex", verbose=True):
     """Retrieve Argus imagery in a background thread (non-blocking).
 
     Spawns a daemon thread to download the image and returns immediately
@@ -3860,7 +3975,7 @@ def threadGetArgusImagery(dateOfInterest, filename=None, imageType="timex", verb
 
     Example:
         >>> import datetime as DT
-        >>> filename = threadGetArgusImagery(DT.datetime(2024, 6, 15, 12, 0, 0))
+        >>> filename = thread_get_argus_imagery(DT.datetime(2024, 6, 15, 12, 0, 0))
         >>> print(f"Downloading to: {filename}")
 
     """
@@ -3872,7 +3987,7 @@ def threadGetArgusImagery(dateOfInterest, filename=None, imageType="timex", verb
         )
 
     t = threading.Thread(
-        target=getArgusImagery,
+        target=get_argus_imagery,
         args=[dateOfInterest],
         kwargs={'filename': filename, 'imageType': imageType, 'verbose': verbose},
         daemon=True
@@ -3881,11 +3996,11 @@ def threadGetArgusImagery(dateOfInterest, filename=None, imageType="timex", verb
     return filename
 
 
-def findArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=True,
-                     search_window_hours=24, method=0):
+def find_argus_imagery(dateOfInterest, filename=None, imageType="timex", verbose=True,
+                       search_window_hours=24, method=0):
     """Find available Argus imagery with configurable search strategy.
 
-    Wrapper around getArgusImagery that searches for available imagery
+    Wrapper around get_argus_imagery that searches for available imagery
     when the exact requested time is not available.
 
     Args:
@@ -3904,7 +4019,7 @@ def findArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=T
             Defaults to 0.
 
     Returns:
-        dict: Same as getArgusImagery, plus:
+        dict: Same as get_argus_imagery, plus:
             - 'time_requested': original requested datetime (rounded to 30-min)
             - 'time_offset_minutes': offset from requested time (negative=earlier)
         Returns None if no image found within search window.
@@ -3912,11 +4027,11 @@ def findArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=T
     Example:
         >>> import datetime as DT
         >>> # Find nearest available image to now
-        >>> result = findArgusImagery(DT.datetime.now(), method=0)
+        >>> result = find_argus_imagery(DT.datetime.now(), method=0)
         >>> if result:
         ...     print(f"Found image {result['time_offset_minutes']} min from requested")
         >>> # Find most recent image before target (for operational use)
-        >>> result = findArgusImagery(DT.datetime.now(), method=1)
+        >>> result = find_argus_imagery(DT.datetime.now(), method=1)
 
     """
     if verbose:
@@ -3950,7 +4065,7 @@ def findArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=T
         if verbose:
             logging.info(f"Trying Argus imagery for {candidate_time.strftime('%Y-%m-%d %H:%M')}...")
 
-        result = getArgusImagery(candidate_time, filename=filename, imageType=imageType, verbose=False)
+        result = get_argus_imagery(candidate_time, filename=filename, imageType=imageType, verbose=False)
 
         if result is not None:
             # Calculate offset from requested time
@@ -3972,6 +4087,25 @@ def findArgusImagery(dateOfInterest, filename=None, imageType="timex", verbose=T
         logging.warning(f"No Argus imagery found within {search_window_hours} hours of "
                        f"{time_requested.strftime('%Y-%m-%d %H:%M')}")
     return None
+
+
+# Deprecated aliases for module-level Argus functions
+def getArgusImagery(*args, **kwargs):
+    """Deprecated: Use get_argus_imagery instead."""
+    warnings.warn("getArgusImagery is deprecated, use get_argus_imagery instead", DeprecationWarning, stacklevel=2)
+    return get_argus_imagery(*args, **kwargs)
+
+
+def threadGetArgusImagery(*args, **kwargs):
+    """Deprecated: Use thread_get_argus_imagery instead."""
+    warnings.warn("threadGetArgusImagery is deprecated, use thread_get_argus_imagery instead", DeprecationWarning, stacklevel=2)
+    return thread_get_argus_imagery(*args, **kwargs)
+
+
+def findArgusImagery(*args, **kwargs):
+    """Deprecated: Use find_argus_imagery instead."""
+    warnings.warn("findArgusImagery is deprecated, use find_argus_imagery instead", DeprecationWarning, stacklevel=2)
+    return find_argus_imagery(*args, **kwargs)
 
 
 def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
@@ -4135,13 +4269,13 @@ def getArgusPixelIntensity(times, location, coordType='FRF', imageType='timex',
 
     # Process each time
     for time_target in times:
-        # Try to get the image using findArgusImagery if search parameters provided
+        # Try to get the image using find_argus_imagery if search parameters provided
         if 'search_window_hours' in kwargs or 'method' in kwargs:
-            result = findArgusImagery(time_target, filename=None, imageType=imageType,
-                                    verbose=verbose, **kwargs)
+            result = find_argus_imagery(time_target, filename=None, imageType=imageType,
+                                        verbose=verbose, **kwargs)
         else:
-            result = getArgusImagery(time_target, filename=None, imageType=imageType,
-                                   verbose=verbose)
+            result = get_argus_imagery(time_target, filename=None, imageType=imageType,
+                                       verbose=verbose)
 
         if result is None:
             if verbose:
