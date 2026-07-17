@@ -832,11 +832,10 @@ class getObs:
                             'name': str(self.ncfile.title), }"""
 
     def get_wave_spec(self, gaugenumber=0, roundto=30, removeBadDataFlag=4, **kwargs):
-        warnings.warn(
-            "get_wave_spec is deprecated, use get_wave_data(..., spec=True) instead",
-            DeprecationWarning,
-            stacklevel=2
-        )
+        """Convenience wrapper for get_wave_data with spec=True.
+
+        Note: Consider using get_wave_data(..., spec=True) directly for clarity.
+        """
         returnAB = kwargs.get('returnAB', False)
         return self.get_wave_data(gaugenumber, roundto, removeBadDataFlag, returnAB=returnAB, spec=True)
 
@@ -2776,15 +2775,40 @@ class getObs:
     }
 
     def __getattr__(self, name):
-        """Handle deprecated method names with warnings."""
+        """Handle deprecated method names with warnings.
+
+        Returns a wrapper that emits the warning when called (not on access),
+        so introspection like hasattr() doesn't trigger warnings.
+        """
         if name in self._DEPRECATED_METHODS:
             new_name = self._DEPRECATED_METHODS[name]
-            warnings.warn(
-                f"{name} is deprecated, use {new_name} instead",
-                DeprecationWarning,
-                stacklevel=2
-            )
-            return getattr(self, new_name)
+            new_method = object.__getattribute__(self, new_name)
+
+            # Special case: getWaveSpec is double-deprecated (name AND functionality)
+            # Skip intermediate get_wave_spec and go directly to get_wave_data
+            if name == 'getWaveSpec':
+                get_wave_data = object.__getattribute__(self, 'get_wave_data')
+
+                def _getWaveSpec_wrapper(*args, **kwargs):
+                    warnings.warn(
+                        "getWaveSpec is deprecated, use get_wave_data(..., spec=True) instead",
+                        DeprecationWarning,
+                        stacklevel=2
+                    )
+                    kwargs['spec'] = True
+                    return get_wave_data(*args, **kwargs)
+
+                return _getWaveSpec_wrapper
+
+            def _deprecated_method_wrapper(*args, **kwargs):
+                warnings.warn(
+                    f"{name} is deprecated, use {new_name} instead",
+                    DeprecationWarning,
+                    stacklevel=2
+                )
+                return new_method(*args, **kwargs)
+
+            return _deprecated_method_wrapper
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
 

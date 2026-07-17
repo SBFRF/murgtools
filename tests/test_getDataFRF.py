@@ -1004,11 +1004,11 @@ class TestGetObsGetCurrents:
 
 
 class TestGetObsGetWaveSpec:
-    """Tests for the getObs.get_wave_spec method (deprecated)."""
+    """Tests for the getObs.get_wave_spec method and deprecated getWaveSpec alias."""
 
     @patch('murgtools.getdata.getDataFRF.nc.date2num')
-    def test_get_wave_spec_emits_deprecation_warning(self, mock_date2num):
-        """Test that get_wave_spec emits a deprecation warning."""
+    def test_getWaveSpec_emits_deprecation_warning(self, mock_date2num):
+        """Test that deprecated getWaveSpec emits a warning pointing to get_wave_data."""
         mock_date2num.return_value = 1577836800.0
         d1 = DT.datetime(2020, 1, 1)
         d2 = DT.datetime(2020, 1, 2)
@@ -1016,9 +1016,28 @@ class TestGetObsGetWaveSpec:
         from murgtools.getdata.getDataFRF import getObs
         obs = getObs(d1, d2)
 
-        with pytest.warns(DeprecationWarning, match="get_wave_spec is deprecated"):
+        with pytest.warns(DeprecationWarning, match="getWaveSpec is deprecated.*get_wave_data"):
             with patch.object(obs, 'get_wave_data', return_value={'test': 'data'}):
-                obs.get_wave_spec()
+                obs.getWaveSpec()
+
+    @patch('murgtools.getdata.getDataFRF.nc.date2num')
+    def test_get_wave_spec_no_warning(self, mock_date2num):
+        """Test that get_wave_spec (new snake_case API) does not emit warnings."""
+        mock_date2num.return_value = 1577836800.0
+        d1 = DT.datetime(2020, 1, 1)
+        d2 = DT.datetime(2020, 1, 2)
+
+        from murgtools.getdata.getDataFRF import getObs
+        obs = getObs(d1, d2)
+
+        with patch.object(obs, 'get_wave_data', return_value={'test': 'data'}):
+            import warnings
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                obs.get_wave_spec(gaugenumber='waverider-26m', roundto=30)
+                # Filter for DeprecationWarnings only
+                deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+                assert len(deprecation_warnings) == 0, "get_wave_spec should not emit DeprecationWarning"
 
     @patch('murgtools.getdata.getDataFRF.nc.date2num')
     def test_get_wave_spec_calls_get_wave_data_with_spec_true(self, mock_date2num):
@@ -1031,10 +1050,7 @@ class TestGetObsGetWaveSpec:
         obs = getObs(d1, d2)
 
         with patch.object(obs, 'get_wave_data', return_value={'test': 'data'}) as mock_wave:
-            import warnings
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                result = obs.get_wave_spec(gaugenumber='waverider-26m', roundto=30)
+            obs.get_wave_spec(gaugenumber='waverider-26m', roundto=30)
 
             mock_wave.assert_called_once()
             call_kwargs = mock_wave.call_args[1]
